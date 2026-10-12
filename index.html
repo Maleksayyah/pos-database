@@ -72,7 +72,7 @@
         .price-ll { font-size: 0.9rem; font-weight: 600; color: var(--success); margin-top: 2px; }
 
         .action-row { display: flex; gap: 8px; margin-top: auto; }
-        .btn-action { flex: 1; padding: 7px 10px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; font-size: 0.85px; transition: opacity 0.2s; font-size: 0.85rem; }
+        .btn-action { flex: 1; padding: 7px 10px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; font-size: 0.85rem; transition: opacity 0.2s; }
         .btn-edit { background: #38bdf8; color: white; }
         .btn-delete { background: #f87171; color: white; }
         .btn-action:hover { opacity: 0.85; }
@@ -80,7 +80,7 @@
         .empty-state { grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--text-muted); background: white; border-radius: 10px; border: 1px dashed var(--border); }
         .empty-state h3 { font-size: 1.2rem; margin-bottom: 8px; color: var(--primary); }
 
-        /* Professional Modal Backdrop & Box */
+        /* Modal Backdrop & Box */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; backdrop-filter: blur(2px); }
         .modal-overlay.active { opacity: 1; pointer-events: auto; }
         .modal-card { background: white; width: 400px; padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); transform: translateY(-10px); transition: transform 0.2s ease; }
@@ -98,7 +98,6 @@
 </head>
 <body>
 
-    <!-- Sidebar Navigation -->
     <div class='sidebar'>
         <div>
             <div class='sidebar-header'>
@@ -110,13 +109,11 @@
         <div class='sidebar-footer'>
             <div id='admin-section'></div>
             <button class='admin-btn btn-logout' onclick='window.location.reload()'>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
                 Logout Session
             </button>
         </div>
     </div>
 
-    <!-- Main Workspace -->
     <div class='main'>
         <div class='top-bar'>
             <div class='search-box'>
@@ -135,7 +132,6 @@
         </div>
     </div>
 
-    <!-- Custom Modal Window for Inputs -->
     <div class='modal-overlay' id='modal-overlay'>
         <div class='modal-card' id='modal-card-content'>
             <h3 id='modal-title'>Modal Title</h3>
@@ -159,14 +155,8 @@
 
         if(isAdmin) {
             document.getElementById('admin-section').innerHTML = `
-                <button class='admin-btn' onclick='openAddCategoryModal()'>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    Add Category
-                </button>
-                <button class='admin-btn' style='background: #e67e22;' onclick='openAddItemModal()'>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    Add Item
-                </button>
+                <button class='admin-btn' onclick='openAddCategoryModal()'>Add Category</button>
+                <button class='admin-btn' style='background: #e67e22;' onclick='openAddItemModal()'>Add Item</button>
             `;
         }
         
@@ -238,9 +228,7 @@
             }
 
             filteredItems.forEach((item) => {
-                // Find actual original index for editing/deleting safely
                 const itemIndex = items.findIndex(i => i.serial === item.serial);
-
                 const card = document.createElement('div');
                 card.className = 'item-card';
                 
@@ -263,9 +251,7 @@
                     <div class='item-info'>
                         <h4>${item.name}</h4>
                         <span class='item-serial'>SN: ${item.serial}</span>
-                        <div class='price-container'>
-                            ${priceHTML}
-                        </div>
+                        <div class='price-container'>${priceHTML}</div>
                     </div>
                     ${adminControls}
                 `;
@@ -273,15 +259,12 @@
             });
         }
 
-        /* Modal Helper Controls */
         const modalOverlay = document.getElementById('modal-overlay');
         function showModal(title, bodyHTML, onSave) {
             document.getElementById('modal-title').innerText = title;
             document.getElementById('modal-body').innerHTML = bodyHTML;
             const saveBtn = document.getElementById('modal-save-btn');
-            saveBtn.onclick = () => {
-                if(onSave()) closeModal();
-            };
+            saveBtn.onclick = () => { if(onSave()) closeModal(); };
             modalOverlay.classList.add('active');
         }
         function closeModal() { modalOverlay.classList.remove('active'); }
@@ -290,7 +273,7 @@
             showModal('Add New Category', `
                 <div class='form-group'>
                     <label>Category Name</label>
-                    <input type='text' id='modal-cat-name' placeholder='e.g., Beverages, Snacks...' autofocus />
+                    <input type='text' id='modal-cat-name' placeholder='e.g., Beverages' autofocus />
                 </div>
             `, () => {
                 const name = document.getElementById('modal-cat-name').value.trim();
@@ -308,22 +291,10 @@
         function openAddItemModal() {
             if(storeData.categories.length === 0) { alert('Please create a category first!'); return; }
             showModal('Add New Product', `
-                <div class='form-group'>
-                    <label>Barcode / Serial Number</label>
-                    <input type='text' id='modal-item-serial' placeholder='Scan or type serial...' autofocus />
-                </div>
-                <div class='form-group'>
-                    <label>Product Name</label>
-                    <input type='text' id='modal-item-name' placeholder='e.g., Energy Drink' />
-                </div>
-                <div class='form-group'>
-                    <label>Price in USD ($)</label>
-                    <input type='number' step='0.01' id='modal-item-usd' placeholder='0.00' />
-                </div>
-                <div class='form-group'>
-                    <label>Price in L.L. (Optional)</label>
-                    <input type='number' id='modal-item-ll' placeholder='0 if not used' value='0' />
-                </div>
+                <div class='form-group'><label>Barcode / Serial</label><input type='text' id='modal-item-serial' autofocus /></div>
+                <div class='form-group'><label>Product Name</label><input type='text' id='modal-item-name' /></div>
+                <div class='form-group'><label>Price USD ($)</label><input type='number' step='0.01' id='modal-item-usd' /></div>
+                <div class='form-group'><label>Price L.L. (Optional)</label><input type='number' id='modal-item-ll' value='0' /></div>
             `, () => {
                 const serial = document.getElementById('modal-item-serial').value.trim();
                 const name = document.getElementById('modal-item-name').value.trim();
@@ -331,38 +302,22 @@
                 const priceLL = parseFloat(document.getElementById('modal-item-ll').value) || 0;
 
                 if(serial && name && !isNaN(priceUSD)) {
-                    if(!storeData.categories[currentCatIndex].items) {
-                        storeData.categories[currentCatIndex].items = [];
-                    }
-                    storeData.categories[currentCatIndex].items.push({
-                        serial: serial,
-                        name: name,
-                        priceUSD: priceUSD,
-                        priceLL: priceLL > 0 ? priceLL : 0
-                    });
+                    if(!storeData.categories[currentCatIndex].items) storeData.categories[currentCatIndex].items = [];
+                    storeData.categories[currentCatIndex].items.push({ serial, name, priceUSD, priceLL: priceLL > 0 ? priceLL : 0 });
                     syncToGitHub();
                     return true;
                 }
-                alert('Please fill in all required fields correctly.');
+                alert('Please fill in required fields.');
                 return false;
             });
         }
 
         function openEditItemModal(catIndex, itemIndex) {
             const item = storeData.categories[catIndex].items[itemIndex];
-            showModal('Edit Product Pricing & Details', `
-                <div class='form-group'>
-                    <label>Product Name</label>
-                    <input type='text' id='modal-edit-name' value='${item.name}' />
-                </div>
-                <div class='form-group'>
-                    <label>Price in USD ($)</label>
-                    <input type='number' step='0.01' id='modal-edit-usd' value='${item.priceUSD}' />
-                </div>
-                <div class='form-group'>
-                    <label>Price in L.L.</label>
-                    <input type='number' id='modal-edit-ll' value='${item.priceLL || 0}' />
-                </div>
+            showModal('Edit Product', `
+                <div class='form-group'><label>Product Name</label><input type='text' id='modal-edit-name' value='${item.name}' /></div>
+                <div class='form-group'><label>Price USD ($)</label><input type='number' step='0.01' id='modal-edit-usd' value='${item.priceUSD}' /></div>
+                <div class='form-group'><label>Price L.L.</label><input type='number' id='modal-edit-ll' value='${item.priceLL || 0}' /></div>
             `, () => {
                 const newName = document.getElementById('modal-edit-name').value.trim();
                 const newUSD = parseFloat(document.getElementById('modal-edit-usd').value);
@@ -375,13 +330,13 @@
                     syncToGitHub();
                     return true;
                 }
-                alert('Invalid input values provided.');
+                alert('Invalid values.');
                 return false;
             });
         }
 
         function deleteCategory(catIndex) {
-            if(confirm(`Are you sure you want to delete category "${storeData.categories[catIndex].name}" and all its contents?`)) {
+            if(confirm('Delete this category and its items?')) {
                 storeData.categories.splice(catIndex, 1);
                 if(currentCatIndex >= storeData.categories.length) currentCatIndex = Math.max(0, storeData.categories.length - 1);
                 syncToGitHub();
@@ -389,17 +344,19 @@
         }
 
         function deleteItem(catIndex, itemIndex) {
-            if(confirm('Are you sure you want to delete this product?')) {
+            if(confirm('Delete this product?')) {
                 storeData.categories[catIndex].items.splice(itemIndex, 1);
                 syncToGitHub();
             }
         }
 
         function syncToGitHub() {
-            window.chrome.webview.postMessage('SAVE_JSON:' + JSON.stringify(storeData, null, 2));
+            // Secure native bridge connection to VB.NET
+            if (window.chrome && window.chrome.webview && window.chrome.webview.hostObjects && window.chrome.webview.hostObjects.nativeBridge) {
+                window.chrome.webview.hostObjects.nativeBridge.PostMessage('SAVE_JSON:' + JSON.stringify(storeData, null, 2));
+            }
         }
 
-        // Search and Barcode Input Listener
         const input = document.getElementById('scanner-input');
         input.addEventListener('input', (e) => {
             searchQuery = e.target.value.trim();
@@ -410,7 +367,9 @@
             if (e.key === 'Enter') {
                 const val = input.value.trim();
                 if(val) {
-                    window.chrome.webview.postMessage('SCAN:' + val);
+                    if (window.chrome && window.chrome.webview && window.chrome.webview.hostObjects && window.chrome.webview.hostObjects.nativeBridge) {
+                        window.chrome.webview.hostObjects.nativeBridge.PostMessage('SCAN:' + val);
+                    }
                     input.value = '';
                     searchQuery = '';
                     renderItems();
