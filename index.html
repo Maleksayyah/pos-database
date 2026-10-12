@@ -106,8 +106,9 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
 .m-act{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 .m-err{color:var(--danger);font-size:.8rem;min-height:1.2em;margin-top:6px}
 
-#scanner-wrapper{width:100%; overflow:hidden; border-radius:12px; background:#000; border:1px solid var(--line)}
+#scanner-wrapper{width:100%; overflow:hidden; border-radius:12px; background:#000; border:1px solid var(--line); position:relative}
 #interactive{width:100%; min-height:220px}
+.flash-btn{position:absolute; top:10px; right:10px; z-index:10; background:rgba(0,0,0,0.6); color:#fff; border:1px solid var(--line); padding:6px 10px; border-radius:8px; font-size:0.85rem}
 
 #scan{position:fixed;top:70px;left:50%;transform:translate(-50%,-10px);background:var(--panel);border:1px solid var(--accent);border-radius:12px;padding:16px 20px;width:90%;max-width:340px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.6);z-index:1500;opacity:0;visibility:hidden;pointer-events:none;transition:all .2s}
 #scan.open{opacity:1;visibility:visible;transform:translate(-50%,0)}
@@ -200,6 +201,7 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
   <div class="modal">
     <h3>Scan Barcode</h3>
     <div id="scanner-wrapper">
+      <button class="flash-btn" id="flash-toggle" onclick="toggleFlash()">⚡ Flash</button>
       <div id="interactive"></div>
     </div>
     <div class="m-act">
@@ -225,7 +227,7 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
 
 <script>
 let store = { categories: [] }, admin = false, cat = 0, query = '', sel = new Set();
-let scanT = null, toastT = null, onSave = null, html5QrcodeScanner = null;
+let scanT = null, toastT = null, onSave = null, html5QrcodeScanner = null, flashState = false, currentStreamTrack = null;
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const usd = n => '$' + (Number(n) || 0).toFixed(2);
@@ -430,27 +432,68 @@ function showScan(serial) {
   return !!found;
 }
 
-/* ---------- Camera Scanner ---------- */
+/* ---------- Camera Scanner with 1x & Flash ---------- */
 function startCameraScanner() {
   $('cam-overlay').classList.add('open');
+  flashState = false;
+  $('flash-toggle').textContent = '⚡ Flash';
+
   if (!html5QrcodeScanner) {
     html5QrcodeScanner = new Html5Qrcode("interactive");
   }
+
+  // Force environment camera at 1x zoom (avoiding wide/macro 0.5x settings)
+  const constraints = {
+    facingMode: "environment",
+    advanced: [{ zoom: 1.0 }]
+  };
+
   html5QrcodeScanner.start(
-    { facingMode: "environment" },
+    constraints,
     { fps: 10, qrbox: { width: 220, height: 150 } },
     (decodedText) => {
       stopCameraScanner();
       showScan(decodedText);
     },
     (errorMessage) => {}
-  ).catch(err => {
+  ).then(() => {
+    // Grab video track reference to handle torch/flash control
+    try {
+      const videoTrack = html5QrcodeScanner.getRunningTrack();
+      if (videoTrack) currentStreamTrack = videoTrack;
+    } catch(e) {}
+  }).catch(err => {
     showToast('Camera access failed', true);
     stopCameraScanner();
   });
 }
 
+function toggleFlash() {
+  if (!currentStreamTrack) {
+    try {
+      currentStreamTrack = html5QrcodeScanner.getRunningTrack();
+    } catch(e) {}
+  }
+  if (currentStreamTrack) {
+    flashState = !flashState;
+    currentStreamTrack.applyConstraints({
+      advanced: [{ torch: flashState }]
+    }).then(() => {
+      $('flash-toggle').textContent = flashState ? '⚡ Flash (On)' : '⚡ Flash';
+    }).catch(err => {
+      showToast('Flashlight not supported on this device', true);
+      flashState = !flashState;
+    });
+  } else {
+    showToast('Camera stream not active', true);
+  }
+}
+
 function stopCameraScanner() {
+  if (currentStreamTrack) {
+    try { currentStreamTrack.applyConstraints({ advanced: [{ torch: false }] }); } catch(e){}
+    currentStreamTrack = null;
+  }
   if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
     html5QrcodeScanner.stop().then(() => {
       $('cam-overlay').classList.remove('open');
@@ -562,7 +605,7 @@ q.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
   e.preventDefault();
   const v = q.value.trim(); if (!v) return;
-  const hit = showScan(v);
+  showScan(v);
   if (v) { q.value = ''; query = ''; render(); }
 });
 </script>
