@@ -237,9 +237,8 @@ const ll = n => 'L.L. ' + (Number(n) || 0).toLocaleString('en-US');
 const GITHUB_USER = "maleksayyah";
 const GITHUB_REPO = "pos-database";
 const GITHUB_PATH = "data.json";
-const GITHUB_TOKEN = "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";
 
-/* ---------- Data Loading & GitHub / Local Sync ---------- */
+/* ---------- Data Loading ---------- */
 async function loadData() {
   try {
     const r = await fetch('https://raw.githubusercontent.com/' + GITHUB_USER + '/' + GITHUB_REPO + '/main/' + GITHUB_PATH + '?t=' + Date.now());
@@ -257,56 +256,6 @@ async function loadData() {
     }
   }
   render();
-}
-
-async function sync() {
-  render();
-  showToast('Pushing changes to GitHub...', false, true);
-  
-  const dataStr = JSON.stringify(store, null, 2);
-  localStorage.setItem('pos_store_data', dataStr);
-
-  try {
-    const apiUrl = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${GITHUB_PATH}`;
-
-    // 1. Fetch file SHA from GitHub repository contents API
-    const getRes = await fetch(apiUrl, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${GITHUB_TOKEN}`,
-        "Accept": "application/vnd.github.v3+json"
-      }
-    });
-
-    if (!getRes.ok) throw new Error("Could not fetch file SHA from GitHub (Check token scopes)");
-    const fileData = await getRes.json();
-    const fileSha = fileData.sha;
-
-    // 2. Encode content to Base64 safely
-    const base64Content = btoa(unescape(encodeURIComponent(dataStr)));
-
-    // 3. Commit update via PUT request
-    const putRes = await fetch(apiUrl, {
-      method: "PUT",
-      headers: {
-        "Authorization": `Bearer ${GITHUB_TOKEN}`,
-        "Accept": "application/vnd.github.v3+json",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        message: "Update POS database inventory from app",
-        content: base64Content,
-        sha: fileSha
-      })
-    });
-
-    if (!putRes.ok) throw new Error("Failed to push commit to GitHub");
-
-    showToast('Successfully updated on GitHub!', false);
-  } catch (err) {
-    showToast('Saved locally (GitHub sync failed)', true);
-    console.error(err);
-  }
 }
 
 /* ---------- Login ---------- */
@@ -433,75 +382,122 @@ function showScan(serial) {
 }
 
 /* ---------- Camera Scanner with 1x & Flash ---------- */
-function startCameraScanner() {
+function getVideoTrack() {
+  const v = document.querySelector('#interactive video');
+  return v && v.srcObject ? v.srcObject.getVideoTracks()[0] : null;
+}
+
+async function startCameraScanner() {
   $('cam-overlay').classList.add('open');
   flashState = false;
   $('flash-toggle').textContent = '⚡ Flash';
 
-  if (!html5QrcodeScanner) {
-    html5QrcodeScanner = new Html5Qrcode("interactive");
+  if (!html5QrcodeScanner) html5QrcodeScanner = new Html5Qrcode("interactive");
+  if (html5QrcodeScanner.isScanning) return;
+
+  try {
+    // Must be exactly ONE key here
+    await html5QrcodeScanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 220, height: 150 } },
+      (decodedText) => { stopCameraScanner(); showScan(decodedText); },
+      () => {}
+    );
+
+    currentStreamTrack = getVideoTrack();
+
+    // Force 1x zoom (avoids the 0.5x ultra-wide look)
+    if (currentStreamTrack && currentStreamTrack.getCapabilities) {
+      const caps = currentStreamTrack.getCapabilities();
+      if (caps.zoom) {
+        const z = Math.min(Math.max(1, caps.zoom.min), caps.zoom.max);
+        try { await currentStreamTrack.applyConstraints({ advanced: [{ zoom: z }] }); } catch (e) {}
+      }
+    }
+  } catch (err) {
+    console.error(err);
+    const msg = (location.protocol !== 'https:' && location.hostname !== 'localhost')
+      ? 'Camera needs HTTPS'
+      : 'Camera access failed (allow permission)';
+    showToast(msg, true);
+    $('cam-overlay').classList.remove('open');
   }
-
-  // Force environment camera at 1x zoom (avoiding wide/macro 0.5x settings)
-  const constraints = {
-    facingMode: "environment",
-    advanced: [{ zoom: 1.0 }]
-  };
-
-  html5QrcodeScanner.start(
-    constraints,
-    { fps: 10, qrbox: { width: 220, height: 150 } },
-    (decodedText) => {
-      stopCameraScanner();
-      showScan(decodedText);
-    },
-    (errorMessage) => {}
-  ).then(() => {
-    // Grab video track reference to handle torch/flash control
-    try {
-      const videoTrack = html5QrcodeScanner.getRunningTrack();
-      if (videoTrack) currentStreamTrack = videoTrack;
-    } catch(e) {}
-  }).catch(err => {
-    showToast('Camera access failed', true);
-    stopCameraScanner();
-  });
 }
 
 function toggleFlash() {
-  if (!currentStreamTrack) {
-    try {
-      currentStreamTrack = html5QrcodeScanner.getRunningTrack();
-    } catch(e) {}
-  }
-  if (currentStreamTrack) {
-    flashState = !flashState;
-    currentStreamTrack.applyConstraints({
-      advanced: [{ torch: flashState }]
-    }).then(() => {
+  const track = currentStreamTrack || getVideoTrack();
+  if (!track) return showToast('Camera stream not active', true);
+  const caps = track.getCapabilities ? track.getCapabilities() : {};
+  if (!caps.torch) return showToast('Flashlight not supported on this device', true);
+  const next = !flashState;
+  track.applyConstraints({ advanced: [{ torch: next }] })
+    .then(() => {
+      flashState = next;
       $('flash-toggle').textContent = flashState ? '⚡ Flash (On)' : '⚡ Flash';
-    }).catch(err => {
-      showToast('Flashlight not supported on this device', true);
-      flashState = !flashState;
-    });
-  } else {
-    showToast('Camera stream not active', true);
-  }
+    })
+    .catch(() => showToast('Flashlight not supported on this device', true));
 }
 
 function stopCameraScanner() {
-  if (currentStreamTrack) {
-    try { currentStreamTrack.applyConstraints({ advanced: [{ torch: false }] }); } catch(e){}
-    currentStreamTrack = null;
-  }
+  currentStreamTrack = null;
+  const close = () => $('cam-overlay').classList.remove('open');
   if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
-    html5QrcodeScanner.stop().then(() => {
-      $('cam-overlay').classList.remove('open');
-    }).catch(() => {
-      $('cam-overlay').classList.remove('open');
-    });
-  } else {
-    $('cam-overlay').classList.remove('open');
+    html5QrcodeScanner.stop().then(close).catch(close);
+  } else close();
+}
+
+function getToken(force) {
+  let t = localStorage.getItem('pos_gh_token');
+  if (!t || force) {
+    t = (prompt('Paste your GitHub token (Contents: Read & Write on pos-database):') || '').trim();
+    if (t) localStorage.setItem('pos_gh_token', t);
+  }
+  return t;
+}
+
+async function sync() {
+  render();
+  const dataStr = JSON.stringify(store, null, 2);
+  localStorage.setItem('pos_store_data', dataStr);
+
+  const token = getToken(false);
+  if (!token) return showToast('Saved locally (no GitHub token)', true);
+  showToast('Pushing changes to GitHub...', false, true);
+
+  const apiUrl = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${GITHUB_PATH}`;
+  const headers = {
+    "Authorization": `Bearer ${token}`,
+    "Accept": "application/vnd.github+json"
+  };
+  const content = btoa(unescape(encodeURIComponent(dataStr)));
+
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const getRes = await fetch(apiUrl + '?ref=main&t=' + Date.now(), { headers, cache: 'no-store' });
+      if (getRes.status === 401) {
+        localStorage.removeItem('pos_gh_token');
+        throw new Error('Token invalid/expired (401)');
+      }
+      if (getRes.status === 404) throw new Error('File/repo not found or token lacks access (404)');
+      if (!getRes.ok) throw new Error('GET failed ' + getRes.status);
+      const sha = (await getRes.json()).sha;
+
+      const putRes = await fetch(apiUrl, {
+        method: "PUT",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "Update POS database inventory from app",
+          content, sha, branch: "main"
+        })
+      });
+      if (putRes.ok) return showToast('Successfully updated on GitHub!', false);
+      if (putRes.status === 409 && attempt === 0) continue; // stale SHA, retry
+      const j = await putRes.json().catch(() => ({}));
+      throw new Error('PUT ' + putRes.status + (j.message ? ': ' + j.message : ''));
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('Saved locally. GitHub: ' + err.message, true);
   }
 }
 
