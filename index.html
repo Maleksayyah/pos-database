@@ -18,7 +18,7 @@
             --border: #e2e8f0;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; cursor: default; }
         body { background-color: var(--bg-color); color: var(--text-main); height: 100vh; overflow: hidden; }
 
         /* Login Screen View */
@@ -37,7 +37,7 @@
         .sidebar-header h2 { font-size: 1.3rem; margin-top: 5px; color: #fff; }
         
         .category-list { padding: 15px; overflow-y: auto; flex: 1; }
-        .category-item { display: flex; align-items: center; background: rgba(255,255,255,0.03); margin-bottom: 8px; border-radius: 6px; overflow: hidden; border: 1px solid transparent; }
+        .category-item { display: flex; align-items: center; background: rgba(255,255,255,0.03); margin-bottom: 8px; border-radius: 6px; overflow: hidden; border: 1px solid transparent; cursor: pointer; }
         .category-item.active { background: var(--accent); }
         .category-btn { flex: 1; padding: 12px 15px; background: transparent; color: white; border: none; text-align: left; cursor: pointer; font-weight: 600; font-size: 0.95rem; }
         .delete-cat-btn { background: transparent; border: none; color: #ff8787; padding: 10px 12px; cursor: pointer; font-size: 1rem; }
@@ -50,7 +50,7 @@
         .top-bar { padding: 15px 25px; background: white; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
         
         .search-box { position: relative; width: 400px; }
-        .search-box input { width: 100%; padding: 10px 15px 10px 38px; font-size: 0.95rem; border: 1px solid var(--border); border-radius: 6px; outline: none; background: #f8fafc; }
+        .search-box input { width: 100%; padding: 10px 15px 10px 38px; font-size: 0.95rem; border: 1px solid var(--border); border-radius: 6px; outline: none; background: #f8fafc; cursor: text; }
         .search-box svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; fill: var(--text-muted); }
 
         .user-badge { display: flex; align-items: center; gap: 10px; font-size: 0.95rem; background: #f1f5f9; padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border); font-weight: 500; }
@@ -83,7 +83,7 @@
         .modal-card { background: white; width: 400px; padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 5px; color: var(--primary-light); }
-        .form-group input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; outline: none; }
+        .form-group input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; outline: none; cursor: text; }
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .modal-btn { padding: 9px 16px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; }
         .modal-btn-cancel { background: #e2e8f0; color: var(--text-main); }
@@ -152,14 +152,17 @@
         let currentCatIndex = 0;
         let searchQuery = '';
 
-        // Fetch data.json directly from GitHub raw link automatically
         async function loadStoreData() {
             try {
                 const response = await fetch('https://raw.githubusercontent.com/maleksayyah/pos-database/main/data.json?t=' + Date.now());
-                storeData = await response.json();
+                const data = await response.json();
+                if(data && data.categories) {
+                    storeData = data;
+                }
                 renderCategories();
             } catch (err) {
                 console.error('Failed to load data.json', err);
+                renderCategories();
             }
         }
 
