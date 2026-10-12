@@ -13,8 +13,8 @@
         {
           "serial": "2508SMJ01076",
           "name": "test1",
-          "priceUSD": 5,
-          "priceLL": 0
+          "priceUSD": 10,
+          "priceLL": 900000
         },
         {
           "serial": "OH3502-1-1USB-HS",
