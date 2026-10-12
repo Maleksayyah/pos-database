@@ -269,29 +269,30 @@ async function sync() {
 
     // 1. Fetch file SHA from GitHub repository contents API
     const getRes = await fetch(apiUrl, {
+      method: "GET",
       headers: {
-        "Authorization": `token ${GITHUB_TOKEN}`,
+        "Authorization": `Bearer ${GITHUB_TOKEN}`,
         "Accept": "application/vnd.github.v3+json"
       }
     });
 
-    if (!getRes.ok) throw new Error("Could not fetch file SHA from GitHub");
+    if (!getRes.ok) throw new Error("Could not fetch file SHA from GitHub (Check token scopes)");
     const fileData = await getRes.json();
     const fileSha = fileData.sha;
 
-    // 2. Encode content to Base64
+    // 2. Encode content to Base64 safely
     const base64Content = btoa(unescape(encodeURIComponent(dataStr)));
 
     // 3. Commit update via PUT request
     const putRes = await fetch(apiUrl, {
       method: "PUT",
       headers: {
-        "Authorization": `token ${GITHUB_TOKEN}`,
+        "Authorization": `Bearer ${GITHUB_TOKEN}`,
         "Accept": "application/vnd.github.v3+json",
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        message: "Update POS database inventory from mobile app",
+        message: "Update POS database inventory from app",
         content: base64Content,
         sha: fileSha
       })
@@ -562,7 +563,7 @@ q.addEventListener('keydown', e => {
   e.preventDefault();
   const v = q.value.trim(); if (!v) return;
   const hit = showScan(v);
-  if (hit) { q.value = ''; query = ''; render(); }
+  if (v) { q.value = ''; query = ''; render(); }
 });
 </script>
 </body>
