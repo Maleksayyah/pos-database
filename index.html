@@ -230,47 +230,83 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const usd = n => '$' + (Number(n) || 0).toFixed(2);
 const ll = n => 'L.L. ' + (Number(n) || 0).toLocaleString('en-US');
-const modalOpen = () => $('overlay').classList.contains('open') \vert{}\vert{}$('cam-overlay').classList.contains('open');
 
-/* ---------- data ---------- */
+// GitHub API Configuration
+const GITHUB_USER = "maleksayyah";
+const GITHUB_REPO = "pos-database";
+const GITHUB_PATH = "data.json";
+const GITHUB_TOKEN = "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";
+
+/* ---------- Data Loading & GitHub / Local Sync ---------- */
 async function loadData() {
   try {
-    const local = localStorage.getItem('pos_store_data');
-    if (local) {
-      store = JSON.parse(local);
-    } else {
-      const r = await fetch('https://raw.githubusercontent.com/maleksayyah/pos-database/main/data.json?t=' + Date.now());
-      if (!r.ok) throw new Error(r.status);
-      const d = await r.json();
-      if (d && Array.isArray(d.categories)) store = d;
+    const r = await fetch('https://raw.githubusercontent.com/' + GITHUB_USER + '/' + GITHUB_REPO + '/main/' + GITHUB_PATH + '?t=' + Date.now());
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    if (d && Array.isArray(d.categories)) {
+      store = d;
       localStorage.setItem('pos_store_data', JSON.stringify(store));
     }
   } catch (e) {
-    showToast('Loaded offline mode', true);
+    const local = localStorage.getItem('pos_store_data');
+    if (local) {
+      store = JSON.parse(local);
+      showToast('Loaded from local storage (Offline)', true);
+    }
   }
   render();
 }
 
-function hostPost(msg) {
-  const w = window.chrome && window.chrome.webview;
-  if (!w) return false;
+async function sync() {
+  render();
+  showToast('Pushing changes to GitHub...', false, true);
+  
+  const dataStr = JSON.stringify(store, null, 2);
+  localStorage.setItem('pos_store_data', dataStr);
+
   try {
-    if (typeof w.postMessage === 'function') { w.postMessage(msg); return true; }
-    if (w.hostObjects && w.hostObjects.nativeBridge) { w.hostObjects.nativeBridge.PostMessage(msg); return true; }
-  } catch (e) {}
-  return false;
-}
+    const apiUrl = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${GITHUB_PATH}`;
 
-function sync() {
-  render();
-  showToast('Saving changes...', false, true);
-  localStorage.setItem('pos_store_data', JSON.stringify(store));
-  if (!hostPost('SAVE_JSON:' + JSON.stringify(store, null, 2))) {
-    showToast('Changes saved locally.', false);
+    // 1. Fetch file SHA from GitHub repository contents API
+    const getRes = await fetch(apiUrl, {
+      headers: {
+        "Authorization": `token ${GITHUB_TOKEN}`,
+        "Accept": "application/vnd.github.v3+json"
+      }
+    });
+
+    if (!getRes.ok) throw new Error("Could not fetch file SHA from GitHub");
+    const fileData = await getRes.json();
+    const fileSha = fileData.sha;
+
+    // 2. Encode content to Base64
+    const base64Content = btoa(unescape(encodeURIComponent(dataStr)));
+
+    // 3. Commit update via PUT request
+    const putRes = await fetch(apiUrl, {
+      method: "PUT",
+      headers: {
+        "Authorization": `token ${GITHUB_TOKEN}`,
+        "Accept": "application/vnd.github.v3+json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: "Update POS database inventory from mobile app",
+        content: base64Content,
+        sha: fileSha
+      })
+    });
+
+    if (!putRes.ok) throw new Error("Failed to push commit to GitHub");
+
+    showToast('Successfully updated on GitHub!', false);
+  } catch (err) {
+    showToast('Saved locally (GitHub sync failed)', true);
+    console.error(err);
   }
 }
 
-/* ---------- login ---------- */
+/* ---------- Login ---------- */
 function selectRole(r) {
   admin = r === 'Admin';
   $('login').classList.add('hidden');
@@ -279,12 +315,13 @@ function selectRole(r) {
   loadData();
   setTimeout(() => $('q').focus(), 50);
 }
+
 function logout() {
   $('app').classList.add('hidden');$('login').classList.remove('hidden');
   sel.clear(); query = ''; $('q').value = '';
 }
 
-/* ---------- render ---------- */
+/* ---------- Render ---------- */
 function render() { renderCats(); renderItems(); renderSel(); }
 
 function renderCats() {
@@ -343,14 +380,14 @@ function renderSel() {
   $('sel-usd').textContent = usd(u);
 }
 
-/* ---------- ui helpers ---------- */
+/* ---------- UI Helpers ---------- */
 function showToast(text, isError = false, loading = false) {
   const t = $('toast');$('t-text').textContent = text;
   $('t-spin').classList.toggle('hidden', !loading);
   t.classList.toggle('err', !!isError);
   t.classList.add('show');
   clearTimeout(toastT);
-  if (!loading) toastT = setTimeout(() => t.classList.remove('show'), 3000);
+  if (!loading) toastT = setTimeout(() => t.classList.remove('show'), 4000);
 }
 
 function openModal(title, html, save, label = 'Save', danger = false) {
@@ -364,12 +401,15 @@ function openModal(title, html, save, label = 'Save', danger = false) {
   $('overlay').classList.add('open');
   setTimeout(() => { const f = $('m-body').querySelector('input'); (f || b).focus(); }, 30);
 }
+
 function closeModal() { $('overlay').classList.remove('open'); onSave = null; $('q').focus(); }
+
 function submitModal() {
   if (!onSave) return;
   const err = onSave();
   if (err) $('m-err').textContent = err; else closeModal();
 }
+
 function confirmBox(msg, fn) {
   openModal('Confirm', `<p style="color:var(--muted)">${esc(msg)}</p>`, () => { fn(); return ''; }, 'Delete', true);
 }
@@ -389,7 +429,7 @@ function showScan(serial) {
   return !!found;
 }
 
-/* ---------- camera scanner ---------- */
+/* ---------- Camera Scanner ---------- */
 function startCameraScanner() {
   $('cam-overlay').classList.add('open');
   if (!html5QrcodeScanner) {
@@ -421,7 +461,7 @@ function stopCameraScanner() {
   }
 }
 
-/* ---------- admin actions ---------- */
+/* ---------- Admin Actions ---------- */
 const field = (id, label, type = 'text', val = '', extra = '') =>
   `<div class="fg"><label for="${id}">${label}</label><input id="${id}" type="${type}" value="${esc(val)}" ${extra}></div>`;
 
@@ -434,6 +474,7 @@ function addCategory() {
     sync(); return '';
   });
 }
+
 function addItem() {
   if (!store.categories.length) return showToast('Create a category first.', true);
   openModal('Add Product',
@@ -449,6 +490,7 @@ function addItem() {
     sync(); return '';
   });
 }
+
 function editItem(ci, serial) {
   const item = (store.categories[ci].items || []).find(i => i.serial === serial);
   if (!item) return;
@@ -462,6 +504,7 @@ function editItem(ci, serial) {
     sync(); return '';
   });
 }
+
 function delItem(ci, serial) {
   confirmBox('Remove product?', () => {
     const c = store.categories[ci];
@@ -469,18 +512,19 @@ function delItem(ci, serial) {
     sel.delete(serial); sync();
   });
 }
+
 function delCat(i) {
   confirmBox(`Delete category?`, () => {
     store.categories.splice(i, 1); cat = 0; sync();
   });
 }
 
-/* ---------- events ---------- */
+/* ---------- Event Listeners ---------- */
 $('logout').addEventListener('click', logout);$('add-cat').addEventListener('click', addCategory);
 $('add-item').addEventListener('click', addItem);$('m-cancel').addEventListener('click', closeModal);
 $('m-save').addEventListener('click', submitModal);$('overlay').addEventListener('mousedown', e => { if (e.target === $('overlay')) closeModal(); });$('sel-clear').addEventListener('click', () => { sel.clear(); renderItems(); renderSel(); });
 
-/* Mobile Drawer Events */
+/* Mobile Navigation Drawer */
 const closeDrawer = () => {
   $('sidebar').classList.remove('mobile-open');$('drawer-backdrop').classList.remove('open');
 };
