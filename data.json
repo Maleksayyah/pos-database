@@ -7,7 +7,7 @@
         {
           "serial": "111222333",
           "name": "Sample Product",
-          "priceUSD": 5,
+          "priceUSD": 4,
           "priceLL": 450000
         },
         {
@@ -19,7 +19,7 @@
         {
           "serial": "OH3502-1-1USB-HS",
           "name": "test2",
-          "priceUSD": 6,
+          "priceUSD": 7,
           "priceLL": 0
         }
       ]
