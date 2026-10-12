@@ -1,0 +1,16 @@
+{
+  "categories": [
+    {
+      "id": "cat_1",
+      "name": "General Items",
+      "items": [
+        {
+          "serial": "111222333",
+          "name": "Sample Product",
+          "priceUSD": 5.00,
+          "priceLL": 450000
+        }
+      ]
+    }
+  ]
+}
