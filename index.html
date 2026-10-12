@@ -19,8 +19,8 @@
             --border: #334155;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; cursor: default; }
-        body { background-color: var(--bg-main); color: var(--text-main); height: 100vh; overflow: hidden; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; cursor: default; pointer-events: auto !important; }
+        body { background-color: var(--bg-main); color: var(--text-main); height: 100vh; overflow: hidden; user-select: none; }
 
         /* Login Screen View */
         #login-view { display: flex; justify-content: center; align-items: center; height: 100vh; background: var(--bg-main); }
@@ -91,7 +91,7 @@
         .spinner { width: 16px; height: 16px; border: 2px solid var(--text-muted); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Modal */
+        /* Modal Overlays */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
         .modal-overlay.active { opacity: 1; pointer-events: auto; }
         .modal-card { background: var(--bg-card); border: 1px solid var(--border); width: 400px; padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
@@ -110,6 +110,22 @@
     <div id='sync-toast'>
         <div class='spinner'></div>
         <span id='sync-text'>Syncing with GitHub...</span>
+    </div>
+
+    <!-- Scan Result Popup Modal (Auto-closes in 3s) -->
+    <div class='modal-overlay' id='scan-overlay'>
+        <div class='modal-card' style='text-align: center;'>
+            <h3 style='color: var(--accent); margin-bottom: 5px;'>Scanned Product</h3>
+            <div id='scan-serial-badge' style='font-size: 0.85rem; color: var(--text-muted); background: var(--bg-main); display: inline-block; padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border); margin-bottom: 15px;'>SN: ---</div>
+            
+            <div style='background: var(--bg-main); padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 12px;'>
+                <div id='scan-item-name' style='font-size: 1.2rem; font-weight: bold; color: var(--text-main); margin-bottom: 8px;'>Searching...</div>
+                <div id='scan-item-usd' style='font-size: 1.6rem; font-weight: bold; color: var(--danger);'>$0.00</div>
+                <div id='scan-item-ll' style='font-size: 1.1rem; font-weight: 600; color: var(--success); margin-top: 4px;'>L.L. 0</div>
+            </div>
+
+            <div style='color: var(--text-muted); font-size: 0.8rem;'>Closing automatically in 3 seconds...</div>
+        </div>
     </div>
 
     <!-- 1. LOGIN VIEW -->
@@ -156,7 +172,7 @@
         </div>
     </div>
 
-    <!-- Modal Dialog -->
+    <!-- Action Modal Dialog -->
     <div class='modal-overlay' id='modal-overlay'>
         <div class='modal-card'>
             <h3 id='modal-title'>Modal Title</h3>
@@ -175,6 +191,7 @@
         let currentCatIndex = 0;
         let searchQuery = '';
         let selectedSerials = new Set();
+        let scanTimer = null;
 
         async function loadStoreData() {
             try {
@@ -224,8 +241,41 @@
             }
         }
 
-        function hideToast() {
-            document.getElementById('sync-toast').classList.remove('show');
+        function showScanResult(serial) {
+            document.getElementById('scan-serial-badge').innerText = 'SN: ' + serial;
+            
+            let foundItem = null;
+            if (storeData && storeData.categories) {
+                for (let cat of storeData.categories) {
+                    if (cat.items) {
+                        let match = cat.items.find(i => i.serial.toLowerCase() === serial.toLowerCase());
+                        if (match) {
+                            foundItem = match;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (foundItem) {
+                document.getElementById('scan-item-name').innerText = foundItem.name;
+                document.getElementById('scan-item-usd').innerText = '$' + parseFloat(foundItem.priceUSD).toFixed(2);
+                document.getElementById('scan-item-ll').innerText = (foundItem.priceLL && foundItem.priceLL > 0) 
+                    ? 'L.L. ' + Number(foundItem.priceLL).toLocaleString() 
+                    : 'L.L. 0';
+            } else {
+                document.getElementById('scan-item-name').innerText = 'Item Not Found';
+                document.getElementById('scan-item-usd').innerText = '---';
+                document.getElementById('scan-item-ll').innerText = '---';
+            }
+
+            const overlay = document.getElementById('scan-overlay');
+            overlay.classList.add('active');
+
+            if (scanTimer) clearTimeout(scanTimer);
+            scanTimer = setTimeout(() => {
+                overlay.classList.remove('active');
+            }, 3000);
         }
 
         function renderCategories() {
@@ -390,7 +440,6 @@
 
         function syncToGitHub() {
             showToast('Syncing changes with GitHub...');
-            // Re-render immediately locally so the UI updates instantly without reloading page
             renderCategories();
             
             if (window.chrome && window.chrome.webview && window.chrome.webview.hostObjects && window.chrome.webview.hostObjects.nativeBridge) {
@@ -403,9 +452,11 @@
         input.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 const val = input.value.trim();
-                if(val && window.chrome?.webview?.hostObjects?.nativeBridge) {
-                    window.chrome.webview.hostObjects.nativeBridge.PostMessage('SCAN:' + val);
-                    input.value = ''; searchQuery = ''; renderItems();
+                if(val) {
+                    showScanResult(val);
+                    input.value = ''; 
+                    searchQuery = ''; 
+                    renderItems();
                 }
             }
         });
