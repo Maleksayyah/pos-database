@@ -5,105 +5,134 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>POS System</title>
 <style>
-:root{--ink:#1b2430;--muted:#6b7686;--line:#e2e6ec;--bg:#f3f5f8;--card:#fff;--side:#16202e;--side2:#223047;--accent:#0f766e;--soft:#e0f2f0;--danger:#b42318;--ok:#067647;--warn:#b54708}
+:root {
+  --bg: #090d16;
+  --panel: #111827;
+  --card: #1f2937;
+  --card-hover: #263346;
+  --side: #0d131f;
+  --side2: #1e293b;
+  --line: #2d3748;
+  --line-light: #374151;
+  --ink: #f3f4f6;
+  --muted: #9ca3af;
+  --accent: #10b981;
+  --accent-hover: #059669;
+  --soft: rgba(16, 185, 129, 0.15);
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+  --ok: #10b981;
+  --warn: #f59e0b;
+  --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+}
+
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
-body{font:14px/1.45 "Segoe UI",system-ui,sans-serif;color:var(--ink);background:var(--bg);overflow:hidden}
-button{font:inherit;cursor:pointer;border:0;border-radius:8px}
-input{font:inherit;user-select:text}
+body{font:14px/1.5 "Inter", system-ui, -apple-system, sans-serif;color:var(--ink);background:var(--bg);overflow:hidden;letter-spacing:-0.01em}
+button{font:inherit;cursor:pointer;border:0;border-radius:8px;transition:all 0.15s ease}
+input{font:inherit;user-select:text;color:var(--ink)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .hidden{display:none!important}
-.num{font-variant-numeric:tabular-nums}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-0.02em}
 
 /* Login */
 #login{display:grid;grid-template-columns:1fr 1fr;height:100%}
-.brand-pane{background:var(--side);color:#fff;padding:56px;display:flex;flex-direction:column;justify-content:space-between}
-.brand-pane h1{font-size:2.2rem;font-weight:600;letter-spacing:-.02em;max-width:12ch;line-height:1.15}
-.brand-pane p{color:#9fb0c6;max-width:34ch}
-.role-pane{display:flex;flex-direction:column;justify-content:center;padding:56px;gap:14px;max-width:460px}
-.role-pane h2{font-size:1.5rem;margin-bottom:6px}
-.role-btn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:18px 20px;background:var(--card);border:1px solid var(--line);text-align:left;border-radius:12px;transition:border-color .15s,box-shadow .15s}
-.role-btn:hover{border-color:var(--accent);box-shadow:0 0 0 3px var(--soft)}
-.role-btn b{font-size:1.05rem}.role-btn span{color:var(--muted);font-size:.9rem}
+.brand-pane{background:linear-gradient(135deg, #0f172a 0%, #060911 100%);color:#fff;padding:64px;display:flex;flex-direction:column;justify-content:space-between;border-right:1px solid var(--line)}
+.brand-pane h1{font-size:2.5rem;font-weight:700;letter-spacing:-0.03em;max-width:12ch;line-height:1.15;background:linear-gradient(to right, #fff, #94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.brand-pane p{color:#94a3b8;max-width:36ch;font-size:1.05rem}
+.role-pane{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:56px;background:var(--bg)}
+.role-box{width:100%;max-width:400px;display:flex;flex-direction:column;gap:16px}
+.role-pane h2{font-size:1.6rem;font-weight:600;margin-bottom:8px;color:#fff}
+.role-btn{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:20px;background:var(--panel);border:1px solid var(--line);text-align:left;border-radius:12px;color:var(--ink)}
+.role-btn:hover{border-color:var(--accent);background:var(--card-hover);box-shadow:0 0 0 1px var(--accent)}
+.role-btn b{font-size:1.1rem;color:#fff}
+.role-btn span{color:var(--muted);font-size:.88rem}
 
 /* App shell */
 #app{display:grid;grid-template-columns:260px 1fr;height:100%}
-aside{background:var(--side);color:#dbe4f0;display:flex;flex-direction:column;min-height:0}
-.logo{padding:22px 20px 14px;font-size:1.15rem;font-weight:600;color:#fff}
-.logo small{display:block;color:#8ea0b8;font-weight:400;font-size:.8rem}
-.side-label{padding:10px 20px 6px;color:#8ea0b8;font-size:.8rem}
+aside{background:var(--side);color:#e2e8f0;display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line)}
+.logo{padding:24px 20px 16px;font-size:1.2rem;font-weight:700;color:#fff;border-bottom:1px solid rgba(255,255,255,0.05)}
+.logo small{display:block;color:var(--accent);font-weight:500;font-size:.75rem;margin-top:2px;text-transform:uppercase;letter-spacing:0.05em}
+.side-label{padding:16px 20px 8px;color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:0.05em;font-weight:600}
 #cats{flex:1;overflow-y:auto;padding:0 10px}
-.cat{display:flex;align-items:center;border-radius:8px;margin-bottom:2px;color:inherit}
-.cat:hover{background:var(--side2)}
-.cat.on{background:var(--soft);color:#0b4f4a}
-.cat-btn{flex:1;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;background:none;color:inherit;text-align:left;font-weight:500}
-.cat-btn i{font-style:normal;font-size:.8rem;opacity:.75}
-.cat-del{background:none;color:#f19a92;padding:8px 10px;font-size:.85rem}
-.cat.on .cat-del{color:var(--danger)}
-.side-foot{padding:14px;border-top:1px solid var(--side2);display:grid;gap:8px}
-.btn{padding:10px 14px;font-weight:600;background:var(--accent);color:#fff}
-.btn:hover{filter:brightness(1.08)}
-.btn.ghost{background:var(--side2);color:#dbe4f0}
-.btn.light{background:#fff;color:var(--ink);border:1px solid var(--line)}
-.btn.danger{background:var(--danger)}
+.cat{display:flex;align-items:center;border-radius:8px;margin-bottom:4px;color:var(--muted);transition:all 0.15s}
+.cat:hover{background:var(--side2);color:#fff}
+.cat.on{background:var(--soft);color:var(--accent);font-weight:600}
+.cat-btn{flex:1;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;background:none;color:inherit;text-align:left}
+.cat-btn i{font-style:normal;font-size:.78rem;background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:12px;color:var(--ink)}
+.cat.on .cat-btn i{background:var(--accent);color:#000;font-weight:700}
+.cat-del{background:none;color:#f87171;padding:8px 10px;font-size:.85rem;opacity:0.6}
+.cat-del:hover{opacity:1;color:var(--danger)}
+.side-foot{padding:16px;border-top:1px solid var(--line);display:grid;gap:8px;background:var(--side)}
+.btn{padding:10px 16px;font-weight:600;background:var(--accent);color:#051d14;border-radius:8px}
+.btn:hover{background:var(--accent-hover);color:#fff}
+.btn.ghost{background:var(--side2);color:var(--ink);border:1px solid var(--line)}
+.btn.ghost:hover{background:var(--card-hover);border-color:var(--muted)}
+.btn.light{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.btn.light:hover{background:var(--card-hover)}
+.btn.danger{background:var(--danger);color:#fff}
+.btn.danger:hover{background:var(--danger-hover)}
 
-main{display:flex;flex-direction:column;min-width:0;min-height:0}
-.top{display:flex;gap:14px;align-items:center;padding:14px 24px;background:var(--card);border-bottom:1px solid var(--line)}
+main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg)}
+.top{display:flex;gap:14px;align-items:center;padding:16px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
 .search{flex:1;max-width:520px;position:relative}
-.search input{width:100%;padding:10px 14px 10px 38px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
-.search input:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px var(--soft)}
-.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;stroke:var(--muted);fill:none;stroke-width:2}
-.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:99px;background:var(--bg);border:1px solid var(--line);font-size:.85rem;color:var(--muted)}
-.chip b{color:var(--ink);font-weight:600}
+.search input{width:100%;padding:10px 14px 10px 40px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:#fff}
+.search input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--soft)}
+.search svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:16px;height:16px;stroke:var(--muted);fill:none;stroke-width:2}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:99px;background:var(--bg);border:1px solid var(--line);font-size:.82rem;color:var(--muted)}
+.chip b{color:#fff;font-weight:600}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
-.dot.ok{background:var(--ok)}.dot.bad{background:var(--danger)}
+.dot.ok{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.dot.bad{background:var(--danger);box-shadow:0 0 8px var(--danger)}
 .spacer{flex:1}
 
 .content{flex:1;overflow-y:auto;padding:24px}
-.head{display:flex;align-items:baseline;gap:12px;margin-bottom:18px}
-.head h2{font-size:1.4rem;font-weight:600}
-.head span{color:var(--muted)}
-#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:4px;cursor:pointer;position:relative}
-.card:hover{border-color:#c4ccd8}
-.card.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--soft)}
-.card.on::after{content:"\2713";position:absolute;top:12px;right:12px;width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;display:grid;place-items:center}
-.name{font-weight:600;font-size:1rem;padding-right:26px}
-.sn{color:var(--muted);font-size:.82rem}
-.usd{font-size:1.45rem;font-weight:700;margin-top:10px}
-.ll{color:var(--ok);font-weight:600;font-size:.92rem}
-.cat-tag{color:var(--muted);font-size:.78rem;margin-top:4px}
-.acts{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
-.acts button{flex:1;padding:7px;font-weight:600;font-size:.85rem;background:var(--bg);color:var(--ink)}
-.acts .del{color:var(--danger)}
-.empty{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--muted);background:var(--card);border:1px dashed var(--line);border-radius:12px}
-.empty h3{color:var(--ink);margin-bottom:4px}
+.head{display:flex;align-items:baseline;gap:12px;margin-bottom:20px}
+.head h2{font-size:1.5rem;font-weight:700;color:#fff}
+.head span{color:var(--muted);font-size:.9rem}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:4px;cursor:pointer;position:relative;transition:all 0.15s ease}
+.card:hover{border-color:var(--line-light);transform:translateY(-2px);background:var(--card)}
+.card.on{border-color:var(--accent);background:var(--card);box-shadow:0 0 0 2px var(--accent)}
+.card.on::after{content:"\2713";position:absolute;top:14px;right:14px;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#000;font-size:13px;font-weight:bold;display:grid;place-items:center}
+.name{font-weight:600;font-size:1.05rem;color:#fff;padding-right:26px}
+.sn{color:var(--muted);font-size:.8rem;font-family:monospace}
+.usd{font-size:1.5rem;font-weight:700;margin-top:12px;color:var(--accent)}
+.ll{color:var(--muted);font-weight:500;font-size:.88rem}
+.cat-tag{color:var(--muted);font-size:.78rem;margin-top:4px;background:var(--bg);padding:2px 8px;border-radius:4px;width:fit-content}
+.acts{display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.acts button{flex:1;padding:8px;font-weight:600;font-size:.82rem;background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+.acts button:hover{background:var(--side2);color:#fff}
+.acts .del{color:#f87171;border-color:rgba(239, 68, 68, 0.2)}
+.acts .del:hover{background:rgba(239, 68, 68, 0.1);color:var(--danger)}
+.empty{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:12px}
+.empty h3{color:#fff;margin-bottom:6px;font-size:1.1rem}
 
-.selbar{display:flex;align-items:center;gap:18px;padding:12px 24px;background:var(--ink);color:#fff}
-.selbar .t{font-weight:700;font-size:1.05rem}
+.selbar{display:flex;align-items:center;gap:20px;padding:14px 28px;background:var(--panel);border-top:1px solid var(--line);box-shadow:0 -10px 25px rgba(0,0,0,0.3)}
+.selbar .t{font-weight:700;font-size:1.2rem;color:var(--accent)}
 
-/* Overlays: hidden ones never intercept clicks */
-.overlay{position:fixed;inset:0;background:rgba(15,23,35,.55);display:grid;place-items:center;z-index:100;visibility:hidden;opacity:0;pointer-events:none;transition:opacity .15s}
+/* Overlays */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);display:grid;place-items:center;z-index:100;visibility:hidden;opacity:0;pointer-events:none;transition:all .15s}
 .overlay.open{visibility:visible;opacity:1;pointer-events:auto}
-.modal{background:#fff;border-radius:14px;width:min(420px,92vw);padding:24px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
-.modal h3{font-size:1.15rem;margin-bottom:14px}
-.fg{margin-bottom:12px}.fg label{display:block;font-size:.85rem;font-weight:600;color:var(--muted);margin-bottom:4px}
-.fg input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:min(440px,92vw);padding:28px;box-shadow:var(--shadow)}
+.modal h3{font-size:1.25rem;margin-bottom:16px;color:#fff;font-weight:600}
+.fg{margin-bottom:14px}.fg label{display:block;font-size:.82rem;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.03em}
+.fg input{width:100%;padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
 .fg input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--soft)}
-.m-act{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
-.m-err{color:var(--danger);font-size:.85rem;min-height:1.2em}
+.m-act{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+.m-err{color:var(--danger);font-size:.85rem;min-height:1.2em;margin-top:8px}
 
-#scan{position:fixed;top:78px;left:50%;transform:translate(-50%,-12px);background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 28px;min-width:340px;text-align:center;box-shadow:0 14px 40px rgba(0,0,0,.22);z-index:90;opacity:0;visibility:hidden;pointer-events:none;transition:all .2s}
+#scan{position:fixed;top:84px;left:50%;transform:translate(-50%,-12px);background:var(--panel);border:1px solid var(--accent);border-radius:14px;padding:20px 32px;min-width:360px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.6);z-index:90;opacity:0;visibility:hidden;pointer-events:none;transition:all .2s}
 #scan.open{opacity:1;visibility:visible;transform:translate(-50%,0)}
-#scan .sname{font-size:1.15rem;font-weight:600}
-#scan .susd{font-size:2.2rem;font-weight:700;margin:4px 0 0}
-#scan .sll{color:var(--ok);font-weight:600}
-#scan .ssn{color:var(--muted);font-size:.82rem}
+#scan .sname{font-size:1.2rem;font-weight:600;color:#fff}
+#scan .susd{font-size:2.4rem;font-weight:700;margin:4px 0 0;color:var(--accent)}
+#scan .sll{color:var(--muted);font-weight:500}
+#scan .ssn{color:var(--muted);font-size:.82rem;font-family:monospace}
 
-#toast{position:fixed;right:20px;bottom:20px;background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;display:flex;gap:10px;align-items:center;z-index:200;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s}
+#toast{position:fixed;right:24px;bottom:24px;background:var(--panel);border:1px solid var(--line);color:#fff;padding:14px 20px;border-radius:10px;display:flex;gap:12px;align-items:center;z-index:200;opacity:0;visibility:hidden;pointer-events:none;transition:all .2s;box-shadow:var(--shadow)}
 #toast.show{opacity:1;visibility:visible}
-#toast.err{background:var(--danger)}
-.spin{width:14px;height:14px;border:2px solid #ffffff55;border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite}
+#toast.err{border-color:var(--danger);background:#1a0c0c;color:#f87171}
+.spin{width:16px;height:16px;border:2px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation-duration:1ms!important}}
 @media (max-width:800px){#login{grid-template-columns:1fr}.brand-pane{display:none}#app{grid-template-columns:200px 1fr}}
@@ -113,13 +142,15 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0}
 
 <section id="login">
   <div class="brand-pane">
-    <h1>Point of sale</h1>
-    <p>Look up prices, scan products and manage inventory in one place.</p>
+    <h1>Point of Sale</h1>
+    <p>Look up prices, scan products, and manage system inventory seamlessly.</p>
   </div>
   <div class="role-pane">
-    <h2>Sign in as</h2>
-    <button class="role-btn" data-role="Cashier"><b>Cashier</b><span>Scan items and check prices</span></button>
-    <button class="role-btn" data-role="Admin"><b>Admin</b><span>Also add, edit and delete inventory</span></button>
+    <div class="role-box">
+      <h2>Sign in to POS</h2>
+      <button class="role-btn" data-role="Cashier"><b>Cashier</b><span>Scan items and check prices</span></button>
+      <button class="role-btn" data-role="Admin"><b>Admin</b><span>Manage inventory and pricing</span></button>
+    </div>
   </div>
 </section>
 
@@ -130,17 +161,17 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0}
     <div id="cats"></div>
     <div class="side-foot">
       <div id="admin-tools" class="hidden" style="display:grid;gap:8px">
-        <button class="btn" id="add-cat">Add category</button>
-        <button class="btn" id="add-item">Add product</button>
+        <button class="btn" id="add-cat">Add Category</button>
+        <button class="btn" id="add-item">Add Product</button>
       </div>
-      <button class="btn ghost" id="logout">Log out</button>
+      <button class="btn ghost" id="logout">Log Out</button>
     </div>
   </aside>
   <main>
     <div class="top">
       <div class="search">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input id="q" type="text" placeholder="Scan a barcode or search by name or serial" autocomplete="off" spellcheck="false">
+        <input id="q" type="text" placeholder="Scan barcode or search name/serial..." autocomplete="off" spellcheck="false">
       </div>
       <span class="spacer"></span>
       <span class="chip"><span class="dot" id="dot"></span><span id="status">Loading</span></span>
@@ -152,11 +183,11 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0}
       <div id="grid"></div>
     </div>
     <div class="selbar hidden" id="selbar">
-      <span><b id="sel-n">0</b> selected</span>
+      <span><b id="sel-n">0</b> items selected</span>
       <span class="t num" id="sel-usd"></span>
       <span class="num" id="sel-ll"></span>
       <span class="spacer"></span>
-      <button class="btn light" id="sel-clear">Clear selection</button>
+      <button class="btn light" id="sel-clear">Clear Selection</button>
     </div>
   </main>
 </div>
@@ -193,9 +224,9 @@ async function loadData() {
     if (!r.ok) throw new Error(r.status);
     const d = await r.json();
     if (d && Array.isArray(d.categories)) store = d;
-    setStatus(true, 'Inventory loaded');
+    setStatus(true, 'System Online');
   } catch (e) {
-    setStatus(false, 'Offline: could not load inventory');
+    setStatus(false, 'Offline Mode');
   }
   render();
 }
@@ -214,23 +245,20 @@ function sync() {
   render();
   showToast('Saving changes...', false, true);
   if (!hostPost('SAVE_JSON:' + JSON.stringify(store, null, 2)))
-    showToast('Changes not saved. Open this page in the POS app to sync.', true);
+    showToast('Changes not saved. Open in POS app to sync.', true);
 }
 
 /* ---------- login ---------- */
 function selectRole(r) {
   admin = r === 'Admin';
   $('login').classList.add('hidden');
-  $('app').classList.remove('hidden');
-  $('role-chip').textContent = r;
-  $('role-sub').textContent = r + ' session';
-  $('admin-tools').classList.toggle('hidden', !admin);
+  $('app').classList.remove('hidden');$('role-chip').textContent = r;
+  $('role-sub').textContent = r + ' mode';$('admin-tools').classList.toggle('hidden', !admin);
   loadData();
   setTimeout(() => $('q').focus(), 50);
 }
 function logout() {
-  $('app').classList.add('hidden');
-  $('login').classList.remove('hidden');
+  $('app').classList.add('hidden');$('login').classList.remove('hidden');
   sel.clear(); query = ''; $('q').value = '';
 }
 
@@ -242,7 +270,7 @@ function renderCats() {
   $('cats').innerHTML = store.categories.map((c, i) => `
     <div class="cat ${i === cat && !query ? 'on' : ''}">
       <button class="cat-btn" data-i="${i}">${esc(c.name)}<i>${(c.items || []).length}</i></button>
-      ${admin ? `<button class="cat-del" data-delcat="${i}" title="Delete category" aria-label="Delete category ${esc(c.name)}">Delete</button>` : ''}
+      ${admin ? `<button class="cat-del" data-delcat="${i}" title="Delete category" aria-label="Delete category ${esc(c.name)}">&times;</button>` : ''}
     </div>`).join('');
 }
 
@@ -262,22 +290,21 @@ function visibleItems() {
 function renderItems() {
   const g = $('grid');
   if (!store.categories.length) {
-    $('title').textContent = 'No categories yet';
-    $('count').textContent = '';
-    g.innerHTML = `<div class="empty"><h3>Your inventory is empty</h3><p>${admin ? 'Add a category to get started.' : 'Ask an admin to add categories.'}</p></div>`;
+    $('title').textContent = 'No categories available';$('count').textContent = '';
+    g.innerHTML = `<div class="empty"><h3>Your inventory is empty</h3><p>${admin ? 'Add a category to begin.' : 'Contact an admin to set up categories.'}</p></div>`;
     return;
   }
   const list = visibleItems();
-  $('title').textContent = query ? 'Search results' : store.categories[cat].name;
-  $('count').textContent = list.length + (list.length === 1 ? ' product' : ' products');
+  $('title').textContent = query ? 'Search Results' : store.categories[cat].name;
+  $('count').textContent = list.length + (list.length === 1 ? ' item' : ' items');
   if (!list.length) {
-    g.innerHTML = `<div class="empty"><h3>${query ? 'No products match your search' : 'No products in this category'}</h3><p>${query ? 'Check the spelling or scan the barcode again.' : (admin ? 'Use Add product to create one.' : '')}</p></div>`;
+    g.innerHTML = `<div class="empty"><h3>${query ? 'No items found' : 'Category is empty'}</h3><p>${query ? 'Verify spelling or scan again.' : (admin ? 'Use "Add Product" to create one.' : '')}</p></div>`;
     return;
   }
   g.innerHTML = list.map(({ it, ci }) => `
     <article class="card ${sel.has(it.serial) ? 'on' : ''}" data-s="${esc(it.serial)}" data-c="${ci}" tabindex="0" role="button" aria-pressed="${sel.has(it.serial)}">
       <div class="name">${esc(it.name)}</div>
-      <div class="sn">SN ${esc(it.serial)}</div>
+      <div class="sn">SN: ${esc(it.serial)}</div>
       <div class="usd num">${usd(it.priceUSD)}</div>
       ${it.priceLL > 0 ? `<div class="ll num">${ll(it.priceLL)}</div>` : ''}
       ${query ? `<div class="cat-tag">${esc(store.categories[ci].name)}</div>` : ''}
@@ -290,16 +317,13 @@ function renderSel() {
   store.categories.forEach(c => (c.items || []).forEach(it => {
     if (sel.has(it.serial)) { u += Number(it.priceUSD) || 0; l += Number(it.priceLL) || 0; }
   }));
-  $('selbar').classList.toggle('hidden', !sel.size);
-  $('sel-n').textContent = sel.size;
-  $('sel-usd').textContent = usd(u);
-  $('sel-ll').textContent = l > 0 ? ll(l) : '';
+  $('selbar').classList.toggle('hidden', !sel.size);$('sel-n').textContent = sel.size;
+  $('sel-usd').textContent = usd(u);$('sel-ll').textContent = l > 0 ? ll(l) : '';
 }
 
 /* ---------- ui helpers ---------- */
 function showToast(text, isError = false, loading = false) {
-  const t = $('toast');
-  $('t-text').textContent = text;
+  const t = $('toast');$('t-text').textContent = text;
   $('t-spin').classList.toggle('hidden', !loading);
   t.classList.toggle('err', !!isError);
   t.classList.add('show');
@@ -325,7 +349,7 @@ function submitModal() {
   if (err) $('m-err').textContent = err; else closeModal();
 }
 function confirmBox(msg, fn) {
-  openModal('Please confirm', `<p>${esc(msg)}</p>`, () => { fn(); return ''; }, 'Delete', true);
+  openModal('Confirmation Required', `<p style="color:var(--muted)">${esc(msg)}</p>`, () => { fn(); return ''; }, 'Delete', true);
 }
 
 function showScan(serial) {
@@ -333,8 +357,8 @@ function showScan(serial) {
   store.categories.forEach(c => (c.items || []).forEach(it => {
     if (!found && it.serial.toLowerCase() === serial.toLowerCase()) found = it;
   }));
-  $('s-sn').textContent = 'SN ' + serial;
-  $('s-name').textContent = found ? found.name : 'Product not found';
+  $('s-sn').textContent = 'SN: ' + serial;
+  $('s-name').textContent = found ? found.name : 'Product Not Found';
   $('s-usd').textContent = found ? usd(found.priceUSD) : '';
   $('s-ll').textContent = found && found.priceLL > 0 ? ll(found.priceLL) : '';
   $('scan').classList.add('open');
@@ -348,7 +372,7 @@ const field = (id, label, type = 'text', val = '', extra = '') =>
   `<div class="fg"><label for="${id}">${label}</label><input id="${id}" type="${type}" value="${esc(val)}" ${extra}></div>`;
 
 function addCategory() {
-  openModal('Add category', field('f-name', 'Category name'), () => {
+  openModal('Add New Category', field('f-name', 'Category Name'), () => {
     const name = $('f-name').value.trim();
     if (!name) return 'Enter a category name.';
     store.categories.push({ id: 'cat_' + Date.now(), name, items: [] });
@@ -357,15 +381,15 @@ function addCategory() {
   });
 }
 function addItem() {
-  if (!store.categories.length) return showToast('Add a category first.', true);
-  openModal('Add product to ' + store.categories[cat].name,
-    field('f-serial', 'Serial / barcode') + field('f-name', 'Name') +
+  if (!store.categories.length) return showToast('Create a category first.', true);
+  openModal('Add Product to ' + store.categories[cat].name,
+    field('f-serial', 'Serial / Barcode') + field('f-name', 'Product Name') +
     field('f-usd', 'Price (USD)', 'number', '', 'step="0.01" min="0"') + field('f-ll', 'Price (L.L.)', 'number', '0', 'min="0"'), () => {
-    const serial = $('f-serial').value.trim(), name = $('f-name').value.trim();
+    const serial = $('f-serial').value.trim(), name =$('f-name').value.trim();
     const p = parseFloat($('f-usd').value), l = parseFloat($('f-ll').value) || 0;
-    if (!serial || !name || isNaN(p)) return 'Serial, name and USD price are required.';
+    if (!serial || !name || isNaN(p)) return 'Serial, name, and USD price are required.';
     const dup = store.categories.some(c => (c.items || []).some(i => i.serial.toLowerCase() === serial.toLowerCase()));
-    if (dup) return 'That serial already exists.';
+    if (dup) return 'Serial code already exists.';
     const c = store.categories[cat];
     (c.items = c.items || []).push({ serial, name, priceUSD: p, priceLL: l });
     sync(); return '';
@@ -374,8 +398,8 @@ function addItem() {
 function editItem(ci, serial) {
   const item = (store.categories[ci].items || []).find(i => i.serial === serial);
   if (!item) return;
-  openModal('Edit product',
-    field('f-name', 'Name', 'text', item.name) +
+  openModal('Edit Product',
+    field('f-name', 'Product Name', 'text', item.name) +
     field('f-usd', 'Price (USD)', 'number', item.priceUSD, 'step="0.01" min="0"') +
     field('f-ll', 'Price (L.L.)', 'number', item.priceLL || 0, 'min="0"'), () => {
     const name = $('f-name').value.trim(), p = parseFloat($('f-usd').value);
@@ -385,27 +409,23 @@ function editItem(ci, serial) {
   });
 }
 function delItem(ci, serial) {
-  confirmBox('Delete this product? This cannot be undone.', () => {
+  confirmBox('Are you sure you want to remove this product?', () => {
     const c = store.categories[ci];
     c.items = (c.items || []).filter(i => i.serial !== serial);
     sel.delete(serial); sync();
   });
 }
 function delCat(i) {
-  confirmBox(`Delete "${store.categories[i].name}" and all its products?`, () => {
+  confirmBox(`Remove "${store.categories[i].name}" and all associated products?`, () => {
     store.categories.splice(i, 1); cat = 0; sync();
   });
 }
 
 /* ---------- events ---------- */
 document.querySelectorAll('.role-btn').forEach(b => b.addEventListener('click', () => selectRole(b.dataset.role)));
-$('logout').addEventListener('click', logout);
-$('add-cat').addEventListener('click', addCategory);
-$('add-item').addEventListener('click', addItem);
-$('m-cancel').addEventListener('click', closeModal);
-$('m-save').addEventListener('click', submitModal);
-$('overlay').addEventListener('mousedown', e => { if (e.target === $('overlay')) closeModal(); });
-$('sel-clear').addEventListener('click', () => { sel.clear(); renderItems(); renderSel(); });
+$('logout').addEventListener('click', logout);$('add-cat').addEventListener('click', addCategory);
+$('add-item').addEventListener('click', addItem);$('m-cancel').addEventListener('click', closeModal);
+$('m-save').addEventListener('click', submitModal);$('overlay').addEventListener('mousedown', e => { if (e.target === $('overlay')) closeModal(); });$('sel-clear').addEventListener('click', () => { sel.clear(); renderItems(); renderSel(); });
 
 $('cats').addEventListener('click', e => {
   const d = e.target.closest('[data-delcat]');
@@ -415,14 +435,7 @@ $('cats').addEventListener('click', e => {
 });
 
 function toggle(serial) { sel.has(serial) ? sel.delete(serial) : sel.add(serial); renderItems(); renderSel(); }
-$('grid').addEventListener('click', e => {
-  const card = e.target.closest('.card'); if (!card) return;
-  const s = card.dataset.s, ci = +card.dataset.c;
-  if (e.target.closest('[data-edit]')) return editItem(ci, s);
-  if (e.target.closest('[data-del]')) return delItem(ci, s);
-  toggle(s);
-});
-$('grid').addEventListener('keydown', e => {
+$('grid').addEventListener('click', e => { const card = e.target.closest('.card'); if (!card) return; const s = card.dataset.s, ci = +card.dataset.c; if (e.target.closest('[data-edit]')) return editItem(ci, s); if (e.target.closest('[data-del]')) return delItem(ci, s); toggle(s); });$('grid').addEventListener('keydown', e => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('card')) { e.preventDefault(); toggle(e.target.dataset.s); }
 });
 
@@ -439,7 +452,6 @@ q.addEventListener('keydown', e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { if (modalOpen()) closeModal(); else $('scan').classList.remove('open'); return; }
   if (e.key === 'Enter' && modalOpen() && e.target.tagName !== 'BUTTON') { e.preventDefault(); submitModal(); return; }
-  /* Barcode scanners type like a keyboard: send stray keystrokes to the search box */
   if (!$('app').classList.contains('hidden') && !modalOpen() && e.target.tagName !== 'INPUT' &&
       e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey && e.key !== ' ') q.focus();
 });
