@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>POS System</title>
+<!-- Barcode Scanner Library -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 :root {
   --bg: #090d16;
@@ -13,7 +15,6 @@
   --side: #0d131f;
   --side2: #1e293b;
   --line: #2d3748;
-  --line-light: #374151;
   --ink: #f3f4f6;
   --muted: #9ca3af;
   --accent: #10b981;
@@ -21,14 +22,12 @@
   --soft: rgba(16, 185, 129, 0.15);
   --danger: #ef4444;
   --danger-hover: #dc2626;
-  --ok: #10b981;
-  --warn: #f59e0b;
   --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
 }
 
 *{box-sizing:border-box;margin:0;padding:0; -webkit-tap-highlight-color: transparent;}
 html,body{height:100%; height: 100svh;}
-body{font:16px/1.5 "Inter", system-ui, -apple-system, sans-serif;color:var(--ink);background:var(--bg);overflow:hidden;letter-spacing:-0.01em}
+body{font:15px/1.5 "Inter", system-ui, -apple-system, sans-serif;color:var(--ink);background:var(--bg);overflow:hidden}
 button{font:inherit;cursor:pointer;border:0;border-radius:10px;transition:all 0.15s ease}
 input{font:inherit;user-select:text;color:var(--ink)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -38,7 +37,7 @@ input{font:inherit;user-select:text;color:var(--ink)}
 /* Login */
 #login{display:grid;grid-template-columns:1fr 1fr;height:100%}
 .brand-pane{background:linear-gradient(135deg, #0f172a 0%, #060911 100%);color:#fff;padding:48px;display:flex;flex-direction:column;justify-content:space-between;border-right:1px solid var(--line)}
-.brand-pane h1{font-size:2.2rem;font-weight:700;letter-spacing:-0.03em;max-width:12ch;line-height:1.15;background:linear-gradient(to right, #fff, #94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.brand-pane h1{font-size:2.2rem;font-weight:700;line-height:1.15;background:linear-gradient(to right, #fff, #94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .brand-pane p{color:#94a3b8;max-width:36ch;font-size:1rem}
 .role-pane{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:24px;background:var(--bg)}
 .role-box{width:100%;max-width:400px;display:flex;flex-direction:column;gap:16px}
@@ -49,18 +48,18 @@ input{font:inherit;user-select:text;color:var(--ink)}
 .role-btn span{color:var(--muted);font-size:.85rem}
 
 /* App shell */
-#app{display:grid;grid-template-columns:260px 1fr;height:100%;height:100svh}
-aside{background:var(--side);color:#e2e8f0;display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line);z-index:10}
+#app{display:flex;width:100vw;height:100%;height:100svh;position:relative;overflow:hidden}
+aside{width:260px;min-width:260px;background:var(--side);color:#e2e8f0;display:flex;flex-direction:column;height:100%;border-right:1px solid var(--line);z-index:20;transition:transform 0.25s ease}
 .logo{padding:18px 16px 12px;font-size:1.1rem;font-weight:700;color:#fff;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:center}
-.logo small{display:block;color:var(--accent);font-weight:500;font-size:.7rem;margin-top:2px;text-transform:uppercase;letter-spacing:0.05em}
-.side-label{padding:12px 16px 6px;color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:0.05em;font-weight:600}
+.logo small{display:block;color:var(--accent);font-weight:500;font-size:.7rem;margin-top:2px;text-transform:uppercase}
+.side-label{padding:12px 16px 6px;color:var(--muted);font-size:.75rem;text-transform:uppercase;font-weight:600}
 #cats{flex:1;overflow-y:auto;padding:0 8px;-webkit-overflow-scrolling:touch}
 .cat{display:flex;align-items:center;border-radius:8px;margin-bottom:4px;color:var(--muted)}
 .cat.on{background:var(--soft);color:var(--accent);font-weight:600}
 .cat-btn{flex:1;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 14px;background:none;color:inherit;text-align:left;font-size:0.95rem}
 .cat-btn i{font-style:normal;font-size:.75rem;background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:12px;color:var(--ink)}
 .cat.on .cat-btn i{background:var(--accent);color:#000;font-weight:700}
-.cat-del{background:none;color:#f87171;padding:10px 12px;font-size:0.9rem}
+.cat-del{background:none;color:#f87171;padding:10px 12px;font-size:1.1rem}
 .side-foot{padding:12px;border-top:1px solid var(--line);display:grid;gap:8px;background:var(--side)}
 .btn{padding:12px 16px;font-weight:600;background:var(--accent);color:#051d14;border-radius:10px;font-size:0.95rem}
 .btn:active{transform:scale(0.98)}
@@ -68,40 +67,36 @@ aside{background:var(--side);color:#e2e8f0;display:flex;flex-direction:column;mi
 .btn.light{background:var(--card);color:var(--ink);border:1px solid var(--line)}
 .btn.danger{background:var(--danger);color:#fff}
 
-main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg)}
-.top{display:flex;gap:10px;align-items:center;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
-.search{flex:1;max-width:100%;position:relative}
-.search input{width:100%;padding:12px 14px 12px 40px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:#fff;font-size:1rem}
-.search svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:18px;height:18px;stroke:var(--muted);fill:none;stroke-width:2}
-.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:99px;background:var(--bg);border:1px solid var(--line);font-size:.78rem;color:var(--muted);white-space:nowrap}
-.chip b{color:#fff;font-weight:600}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
-.dot.ok{background:var(--ok);box-shadow:0 0 6px var(--ok)}
-.dot.bad{background:var(--danger)}
-.spacer{flex:1}
+main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;background:var(--bg)}
+.top{display:flex;gap:8px;align-items:center;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.search{flex:1;display:flex;gap:8px;align-items:center}
+.search-input-wrap{position:relative;flex:1}
+.search input{width:100%;padding:10px 12px 10px 36px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:#fff;font-size:0.95rem}
+.search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:18px;height:18px;stroke:var(--muted);fill:none;stroke-width:2}
+.cam-btn{background:var(--accent);color:#051d14;padding:10px 14px;font-size:1.1rem;display:flex;align-items:center;justify-content:center;border-radius:10px}
 
 .content{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
 .head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
 .head h2{font-size:1.25rem;font-weight:700;color:#fff}
 .head span{color:var(--muted);font-size:.85rem}
-#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:4px;cursor:pointer;position:relative}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:4px;cursor:pointer;position:relative}
 .card.on{border-color:var(--accent);background:var(--card);box-shadow:0 0 0 2px var(--accent)}
-.card.on::after{content:"\2713";position:absolute;top:10px;right:10px;width:20px;height:20px;border-radius:50%;background:var(--accent);color:#000;font-size:11px;font-weight:bold;display:grid;place-items:center}
-.name{font-weight:600;font-size:0.95rem;color:#fff;padding-right:20px;line-height:1.3}
-.sn{color:var(--muted);font-size:.75rem;font-family:monospace}
-.usd{font-size:1.25rem;font-weight:700;margin-top:8px;color:var(--accent)}
-.ll{color:var(--muted);font-weight:500;font-size:.8rem}
-.cat-tag{color:var(--muted);font-size:.72rem;margin-top:4px;background:var(--bg);padding:2px 6px;border-radius:4px;width:fit-content}
-.acts{display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
-.acts button{flex:1;padding:8px 4px;font-weight:600;font-size:.8rem;background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+.card.on::after{content:"\2713";position:absolute;top:8px;right:8px;width:18px;height:18px;border-radius:50%;background:var(--accent);color:#000;font-size:10px;font-weight:bold;display:grid;place-items:center}
+.name{font-weight:600;font-size:0.9rem;color:#fff;padding-right:16px;line-height:1.2}
+.sn{color:var(--muted);font-size:.72rem;font-family:monospace;word-break:break-all}
+.usd{font-size:1.2rem;font-weight:700;margin-top:6px;color:var(--accent)}
+.ll{color:var(--muted);font-weight:500;font-size:.78rem}
+.cat-tag{color:var(--muted);font-size:.7rem;margin-top:4px;background:var(--bg);padding:2px 6px;border-radius:4px;width:fit-content}
+.acts{display:flex;gap:4px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.acts button{flex:1;padding:6px 2px;font-weight:600;font-size:.75rem;background:var(--bg);color:var(--ink);border:1px solid var(--line)}
 .acts .del{color:#f87171;border-color:rgba(239, 68, 68, 0.2)}
 .empty{grid-column:1/-1;text-align:center;padding:40px 16px;color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:12px}
 
 .selbar{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--panel);border-top:1px solid var(--line)}
 .selbar .t{font-weight:700;font-size:1.05rem;color:var(--accent)}
 
-/* Overlays */
+/* Overlay & Scanner */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(4px);display:grid;place-items:center;z-index:100;visibility:hidden;opacity:0;pointer-events:none;transition:all .15s;padding:16px}
 .overlay.open{visibility:visible;opacity:1;pointer-events:auto}
 .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:100%;max-width:400px;padding:20px;box-shadow:var(--shadow)}
@@ -110,6 +105,10 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(
 .fg input{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:1rem}
 .m-act{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 .m-err{color:var(--danger);font-size:.8rem;min-height:1.2em;margin-top:6px}
+
+/* Scanner Modal Specifics */
+#scanner-wrapper{width:100%; overflow:hidden; border-radius:12px; background:#000; border:1px solid var(--line)}
+#interactive{width:100%; min-height:220px}
 
 #scan{position:fixed;top:70px;left:50%;transform:translate(-50%,-10px);background:var(--panel);border:1px solid var(--accent);border-radius:12px;padding:16px 20px;width:90%;max-width:340px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.6);z-index:90;opacity:0;visibility:hidden;pointer-events:none;transition:all .2s}
 #scan.open{opacity:1;visibility:visible;transform:translate(-50%,0)}
@@ -124,16 +123,18 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(
 .spin{width:14px;height:14px;border:2px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 
-/* Mobile Responsive Adjustments */
+/* Responsive Navigation Drawer */
+.menu-btn{background:var(--panel); border:1px solid var(--line); color:#fff; padding:8px 12px; font-size:1.1rem; border-radius:8px; display:none}
+.backdrop{position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:15; display:none}
+
 @media (max-width: 768px) {
   #login{grid-template-columns:1fr}
   .brand-pane{display:none}
-  #app{grid-template-columns:1fr; position:relative}
-  aside{position:absolute; left:0; top:0; bottom:0; width:260px; transform:translateX(-100%); transition:transform .25s ease; box-shadow: 10px 0 30px rgba(0,0,0,0.5)}
+  aside{position:absolute; left:0; top:0; bottom:0; transform:translateX(-100%); box-shadow:10px 0 30px rgba(0,0,0,0.8)}
   aside.mobile-open{transform:translateX(0)}
-  .mobile-menu-toggle{display:block !important}
+  .menu-btn{display:block}
+  .backdrop.open{display:block}
 }
-.mobile-menu-toggle{display:none; background:none; color:#fff; padding:4px 8px; font-size:1.2rem}
 </style>
 </head>
 <body>
@@ -153,10 +154,11 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(
 </section>
 
 <div id="app" class="hidden">
+  <div class="backdrop" id="drawer-backdrop"></div>
   <aside id="sidebar">
     <div class="logo">
       <span>POS System<small id="role-sub"></small></span>
-      <button class="mobile-menu-toggle" id="close-menu">&times;</button>
+      <button class="menu-btn" id="close-menu">&times;</button>
     </div>
     <div class="side-label">Categories</div>
     <div id="cats"></div>
@@ -170,13 +172,14 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(
   </aside>
   <main>
     <div class="top">
-      <button class="mobile-menu-toggle" id="open-menu" style="display:none; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 12px; font-size:1rem;">☰</button>
+      <button class="menu-btn" id="open-menu">☰</button>
       <div class="search">
-        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input id="q" type="text" placeholder="Scan barcode or search..." autocomplete="off" spellcheck="false">
+        <div class="search-input-wrap">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="q" type="text" placeholder="Scan or search..." autocomplete="off" spellcheck="false">
+        </div>
+        <button class="cam-btn" id="open-cam" title="Open Camera Scanner">📷</button>
       </div>
-      <span class="chip" style="display:none;"><span class="dot" id="dot"></span></span>
-      <span class="chip num" id="clock"></span>
     </div>
     <div class="content">
       <div class="head"><h2 id="title">Products</h2><span id="count"></span></div>
@@ -185,14 +188,28 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(
     <div class="selbar hidden" id="selbar">
       <span><b id="sel-n">0</b> selected</span>
       <span class="t num" id="sel-usd"></span>
-      <span class="spacer"></span>
-      <button class="btn light" id="sel-clear" style="padding:8px 12px; font-size:0.85rem;">Clear</button>
+      <div style="flex:1"></div>
+      <button class="btn light" id="sel-clear" style="padding:6px 10px; font-size:0.8rem;">Clear</button>
     </div>
   </main>
 </div>
 
 <div id="scan"><div class="ssn" id="s-sn"></div><div class="sname" id="s-name"></div><div class="susd num" id="s-usd"></div><div class="sll num" id="s-ll"></div></div>
 
+<!-- Camera Modal -->
+<div class="overlay" id="cam-overlay">
+  <div class="modal">
+    <h3>Scan Barcode</h3>
+    <div id="scanner-wrapper">
+      <div id="interactive"></div>
+    </div>
+    <div class="m-act">
+      <button class="btn light" id="cam-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit / Add Modal -->
 <div class="overlay" id="overlay">
   <div class="modal" role="dialog" aria-modal="true">
     <h3 id="m-title"></h3>
@@ -209,12 +226,12 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(
 
 <script>
 let store = { categories: [] }, admin = false, cat = 0, query = '', sel = new Set();
-let scanT = null, toastT = null, onSave = null;
+let scanT = null, toastT = null, onSave = null, html5QrcodeScanner = null;
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const usd = n => '$' + (Number(n) || 0).toFixed(2);
 const ll = n => 'L.L. ' + (Number(n) || 0).toLocaleString('en-US');
-const modalOpen = () => $('overlay').classList.contains('open');
+const modalOpen = () => $('overlay').classList.contains('open') \vert{}\vert{}$('cam-overlay').classList.contains('open');
 
 /* ---------- data ---------- */
 async function loadData() {
@@ -223,13 +240,11 @@ async function loadData() {
     if (!r.ok) throw new Error(r.status);
     const d = await r.json();
     if (d && Array.isArray(d.categories)) store = d;
-    setStatus(true, 'Online');
   } catch (e) {
-    setStatus(false, 'Offline');
+    showToast('Loaded offline mode', true);
   }
   render();
 }
-function setStatus(ok, text) { $('dot').className = 'dot ' + (ok ? 'ok' : 'bad'); }
 
 function hostPost(msg) {
   const w = window.chrome && window.chrome.webview;
@@ -244,7 +259,7 @@ function sync() {
   render();
   showToast('Saving changes...', false, true);
   if (!hostPost('SAVE_JSON:' + JSON.stringify(store, null, 2)))
-    showToast('Changes synced locally.', false);
+    showToast('Changes saved locally.', false);
 }
 
 /* ---------- login ---------- */
@@ -290,14 +305,14 @@ function renderItems() {
   const g = $('grid');
   if (!store.categories.length) {
     $('title').textContent = 'No categories';$('count').textContent = '';
-    g.innerHTML = `<div class="empty"><h3>Inventory is empty</h3><p>${admin ? 'Add a category to begin.' : ''}</p></div>`;
+    g.innerHTML = `<div class="empty"><h3>Inventory empty</h3><p>${admin ? 'Add a category to begin.' : ''}</p></div>`;
     return;
   }
   const list = visibleItems();
   $('title').textContent = query ? 'Results' : store.categories[cat].name;
   $('count').textContent = list.length + (list.length === 1 ? ' item' : ' items');
   if (!list.length) {
-    g.innerHTML = `<div class="empty"><h3>No items found</h3><p>${query ? 'Check spelling or scan again.' : ''}</p></div>`;
+    g.innerHTML = `<div class="empty"><h3>No items found</h3><p>${query ? 'Check search term.' : ''}</p></div>`;
     return;
   }
   g.innerHTML = list.map(({ it, ci }) => `
@@ -312,9 +327,9 @@ function renderItems() {
 }
 
 function renderSel() {
-  let u = 0, l = 0;
+  let u = 0;
   store.categories.forEach(c => (c.items || []).forEach(it => {
-    if (sel.has(it.serial)) { u += Number(it.priceUSD) || 0; l += Number(it.priceLL) || 0; }
+    if (sel.has(it.serial)) { u += Number(it.priceUSD) || 0; }
   }));
   $('selbar').classList.toggle('hidden', !sel.size);$('sel-n').textContent = sel.size;
   $('sel-usd').textContent = usd(u);
@@ -364,6 +379,38 @@ function showScan(serial) {
   clearTimeout(scanT);
   scanT = setTimeout(() => $('scan').classList.remove('open'), 3000);
   return !!found;
+}
+
+/* ---------- camera scanner ---------- */
+function startCameraScanner() {
+  $('cam-overlay').classList.add('open');
+  if (!html5QrcodeScanner) {
+    html5QrcodeScanner = new Html5Qrcode("interactive");
+  }
+  html5QrcodeScanner.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: { width: 220, height: 150 } },
+    (decodedText) => {
+      stopCameraScanner();
+      showScan(decodedText);
+    },
+    (errorMessage) => {}
+  ).catch(err => {
+    showToast('Camera access failed', true);
+    stopCameraScanner();
+  });
+}
+
+function stopCameraScanner() {
+  if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
+    html5QrcodeScanner.stop().then(() => {
+      $('cam-overlay').classList.remove('open');
+    }).catch(() => {
+      $('cam-overlay').classList.remove('open');
+    });
+  } else {
+    $('cam-overlay').classList.remove('open');
+  }
 }
 
 /* ---------- admin actions ---------- */
@@ -426,16 +473,25 @@ $('logout').addEventListener('click', logout);$('add-cat').addEventListener('cli
 $('add-item').addEventListener('click', addItem);$('m-cancel').addEventListener('click', closeModal);
 $('m-save').addEventListener('click', submitModal);$('overlay').addEventListener('mousedown', e => { if (e.target === $('overlay')) closeModal(); });$('sel-clear').addEventListener('click', () => { sel.clear(); renderItems(); renderSel(); });
 
-/* Mobile Menu Toggle */
-$('open-menu').addEventListener('click', () =>$('sidebar').classList.add('mobile-open'));
-$('close-menu').addEventListener('click', () =>$('sidebar').classList.remove('mobile-open'));
+/* Mobile Drawer Events */
+const closeDrawer = () => {
+  $('sidebar').classList.remove('mobile-open');$('drawer-backdrop').classList.remove('open');
+};
+$('open-menu').addEventListener('click', () => {
+  $('sidebar').classList.add('mobile-open');$('drawer-backdrop').classList.add('open');
+});
+$('close-menu').addEventListener('click', closeDrawer);$('drawer-backdrop').addEventListener('click', closeDrawer);
+
+/* Camera Events */
+$('open-cam').addEventListener('click', startCameraScanner);$('cam-close').addEventListener('click', stopCameraScanner);
 
 $('cats').addEventListener('click', e => {
   const d = e.target.closest('[data-delcat]');
   if (d) return delCat(+d.dataset.delcat);
   const b = e.target.closest('[data-i]');
   if (b) { 
-    cat = +b.dataset.i; query = ''; $('q').value = ''; render();$('sidebar').classList.remove('mobile-open');
+    cat = +b.dataset.i; query = ''; $('q').value = ''; render(); 
+    closeDrawer();
   }
 });
 
@@ -457,9 +513,6 @@ q.addEventListener('keydown', e => {
   const hit = showScan(v);
   if (hit) { q.value = ''; query = ''; render(); }
 });
-
-function tick() { $('clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
-tick(); setInterval(tick, 30000);
 </script>
 </body>
 </html>
