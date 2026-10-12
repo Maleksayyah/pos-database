@@ -35,14 +35,14 @@ input{font:inherit;user-select:text;color:var(--ink)}
 .num{font-variant-numeric:tabular-nums;letter-spacing:-0.02em}
 
 /* Login */
-#login{display:grid;grid-template-columns:1fr 1fr;height:100%}
+#login{position:fixed;inset:0;z-index:1000;display:grid;grid-template-columns:1fr 1fr;background:var(--bg);height:100%}
 .brand-pane{background:linear-gradient(135deg, #0f172a 0%, #060911 100%);color:#fff;padding:48px;display:flex;flex-direction:column;justify-content:space-between;border-right:1px solid var(--line)}
 .brand-pane h1{font-size:2.2rem;font-weight:700;line-height:1.15;background:linear-gradient(to right, #fff, #94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .brand-pane p{color:#94a3b8;max-width:36ch;font-size:1rem}
 .role-pane{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:24px;background:var(--bg)}
 .role-box{width:100%;max-width:400px;display:flex;flex-direction:column;gap:16px}
 .role-pane h2{font-size:1.5rem;font-weight:600;margin-bottom:4px;color:#fff}
-.role-btn{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:18px 20px;background:var(--panel);border:1px solid var(--line);text-align:left;border-radius:12px;color:var(--ink)}
+.role-btn{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:18px 20px;background:var(--panel);border:1px solid var(--line);text-align:left;border-radius:12px;color:var(--ink);width:100%}
 .role-btn:active{transform:scale(0.98)}
 .role-btn b{font-size:1.1rem;color:#fff}
 .role-btn span{color:var(--muted);font-size:.85rem}
@@ -97,7 +97,7 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
 .selbar .t{font-weight:700;font-size:1.05rem;color:var(--accent)}
 
 /* Overlay & Scanner */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(4px);display:grid;place-items:center;z-index:100;visibility:hidden;opacity:0;pointer-events:none;transition:all .15s;padding:16px}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(4px);display:grid;place-items:center;z-index:2000;visibility:hidden;opacity:0;pointer-events:none;transition:all .15s;padding:16px}
 .overlay.open{visibility:visible;opacity:1;pointer-events:auto}
 .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:100%;max-width:400px;padding:20px;box-shadow:var(--shadow)}
 .modal h3{font-size:1.15rem;margin-bottom:14px;color:#fff;font-weight:600}
@@ -106,18 +106,17 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
 .m-act{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 .m-err{color:var(--danger);font-size:.8rem;min-height:1.2em;margin-top:6px}
 
-/* Scanner Modal Specifics */
 #scanner-wrapper{width:100%; overflow:hidden; border-radius:12px; background:#000; border:1px solid var(--line)}
 #interactive{width:100%; min-height:220px}
 
-#scan{position:fixed;top:70px;left:50%;transform:translate(-50%,-10px);background:var(--panel);border:1px solid var(--accent);border-radius:12px;padding:16px 20px;width:90%;max-width:340px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.6);z-index:90;opacity:0;visibility:hidden;pointer-events:none;transition:all .2s}
+#scan{position:fixed;top:70px;left:50%;transform:translate(-50%,-10px);background:var(--panel);border:1px solid var(--accent);border-radius:12px;padding:16px 20px;width:90%;max-width:340px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.6);z-index:1500;opacity:0;visibility:hidden;pointer-events:none;transition:all .2s}
 #scan.open{opacity:1;visibility:visible;transform:translate(-50%,0)}
 #scan .sname{font-size:1.1rem;font-weight:600;color:#fff}
 #scan .susd{font-size:2rem;font-weight:700;margin:2px 0 0;color:var(--accent)}
 #scan .sll{color:var(--muted);font-size:.85rem}
 #scan .ssn{color:var(--muted);font-size:.78rem;font-family:monospace}
 
-#toast{position:fixed;right:16px;bottom:16px;left:16px;background:var(--panel);border:1px solid var(--line);color:#fff;padding:12px 16px;border-radius:10px;display:flex;gap:10px;align-items:center;z-index:200;opacity:0;visibility:hidden;pointer-events:none;transition:all .2s;text-align:center;justify-content:center}
+#toast{position:fixed;right:16px;bottom:16px;left:16px;background:var(--panel);border:1px solid var(--line);color:#fff;padding:12px 16px;border-radius:10px;display:flex;gap:10px;align-items:center;z-index:3000;opacity:0;visibility:hidden;pointer-events:none;transition:all .2s;text-align:center;justify-content:center}
 #toast.show{opacity:1;visibility:visible}
 #toast.err{border-color:var(--danger);background:#1a0c0c;color:#f87171}
 .spin{width:14px;height:14px;border:2px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite}
@@ -147,8 +146,8 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
   <div class="role-pane">
     <div class="role-box">
       <h2>Sign in to POS</h2>
-      <button class="role-btn" data-role="Cashier"><b>Cashier</b><span>Scan items and check prices</span></button>
-      <button class="role-btn" data-role="Admin"><b>Admin</b><span>Manage inventory and pricing</span></button>
+      <button class="role-btn" onclick="selectRole('Cashier')"><b>Cashier</b><span>Scan items and check prices</span></button>
+      <button class="role-btn" onclick="selectRole('Admin')"><b>Admin</b><span>Manage inventory and pricing</span></button>
     </div>
   </div>
 </section>
@@ -236,10 +235,16 @@ const modalOpen = () => $('overlay').classList.contains('open') \vert{}\vert{}$(
 /* ---------- data ---------- */
 async function loadData() {
   try {
-    const r = await fetch('https://raw.githubusercontent.com/maleksayyah/pos-database/main/data.json?t=' + Date.now());
-    if (!r.ok) throw new Error(r.status);
-    const d = await r.json();
-    if (d && Array.isArray(d.categories)) store = d;
+    const local = localStorage.getItem('pos_store_data');
+    if (local) {
+      store = JSON.parse(local);
+    } else {
+      const r = await fetch('https://raw.githubusercontent.com/maleksayyah/pos-database/main/data.json?t=' + Date.now());
+      if (!r.ok) throw new Error(r.status);
+      const d = await r.json();
+      if (d && Array.isArray(d.categories)) store = d;
+      localStorage.setItem('pos_store_data', JSON.stringify(store));
+    }
   } catch (e) {
     showToast('Loaded offline mode', true);
   }
@@ -255,11 +260,14 @@ function hostPost(msg) {
   } catch (e) {}
   return false;
 }
+
 function sync() {
   render();
   showToast('Saving changes...', false, true);
-  if (!hostPost('SAVE_JSON:' + JSON.stringify(store, null, 2)))
+  localStorage.setItem('pos_store_data', JSON.stringify(store));
+  if (!hostPost('SAVE_JSON:' + JSON.stringify(store, null, 2))) {
     showToast('Changes saved locally.', false);
+  }
 }
 
 /* ---------- login ---------- */
@@ -468,7 +476,6 @@ function delCat(i) {
 }
 
 /* ---------- events ---------- */
-document.querySelectorAll('.role-btn').forEach(b => b.addEventListener('click', () => selectRole(b.dataset.role)));
 $('logout').addEventListener('click', logout);$('add-cat').addEventListener('click', addCategory);
 $('add-item').addEventListener('click', addItem);$('m-cancel').addEventListener('click', closeModal);
 $('m-save').addEventListener('click', submitModal);$('overlay').addEventListener('mousedown', e => { if (e.target === $('overlay')) closeModal(); });$('sel-clear').addEventListener('click', () => { sel.clear(); renderItems(); renderSel(); });
