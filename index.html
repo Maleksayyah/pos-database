@@ -448,9 +448,14 @@
         }
 
         const input = document.getElementById('scanner-input');
-        input.addEventListener('input', (e) => { searchQuery = e.target.value.trim(); renderItems(); });
-        input.addEventListener('keypress', (e) => {
+        input.addEventListener('input', (e) => { 
+            searchQuery = e.target.value.trim(); 
+            renderItems(); 
+        });
+        
+        input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
+                e.preventDefault();
                 const val = input.value.trim();
                 if(val) {
                     showScanResult(val);
