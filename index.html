@@ -1,383 +1,151 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Professional POS System</title>
-    <style>
-        :root {
-            --primary: #2c3e50;
-            --primary-light: #34495e;
-            --accent: #3498db;
-            --success: #27ae60;
-            --danger: #e74c3c;
-            --warning: #f39c12;
-            --bg-color: #f4f7f6;
-            --card-bg: #ffffff;
-            --text-main: #333333;
-            --text-muted: #7f8c8d;
-            --border: #e2e8f0;
+Imports System.IO
+Imports System.Net.Http
+Imports System.Runtime.InteropServices
+Imports Microsoft.Web.WebView2.Core
+Imports Microsoft.Web.WebView2.WinForms
+
+<ClassInterface(ClassInterfaceType.AutoDual)>
+<ComVisible(True)>
+Public Class Bridge
+    Private ownerForm As Form1
+    Public Sub New(form As Form1)
+        ownerForm = form
+    End Sub
+    Public Sub PostMessage(action As String)
+        ownerForm.HandleWebAction(action)
+    End Sub
+End Class
+
+Public Class Form1
+    Private Const GITHUB_TOKEN As String = "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"
+    Private Const REPO_OWNER As String = "maleksayyah"
+    Private Const REPO_NAME As String = "pos-database"
+
+    Private ReadOnly GITHUB_JSON_URL As String = $"https://raw.githubusercontent.com/{REPO_OWNER}/{REPO_NAME}/main/data.json"
+    Private ReadOnly GITHUB_HTML_URL As String = $"https://raw.githubusercontent.com/{REPO_OWNER}/{REPO_NAME}/main/index.html"
+
+    Private WithEvents webView As WebView2
+    Private activePopup As Form = Nothing
+
+    Async Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        Me.WindowState = FormWindowState.Maximized
+
+        webView = New WebView2() With {.Dock = DockStyle.Fill}
+        Me.Controls.Add(webView)
+
+        Await webView.EnsureCoreWebView2Async(Nothing)
+        webView.CoreWebView2.AddHostObjectToScript("nativeBridge", New Bridge(Me))
+
+        Await LoadAppInterface()
+    End Sub
+
+    ' Fetch index.html and data.json from GitHub and load once
+    Private Async Function LoadAppInterface() As Task
+        Dim jsonData As String = "{""categories"":[]}"
+        Dim htmlTemplate As String = "<html><body>Error loading from GitHub.</body></html>"
+
+        Try
+            Using client As New HttpClient()
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("VB.NET-POS-App")
+                Dim jsonTask = client.GetStringAsync(GITHUB_JSON_URL)
+                Dim htmlTask = client.GetStringAsync(GITHUB_HTML_URL)
+                jsonData = Await jsonTask
+                htmlTemplate = Await htmlTask
+            End Using
+        Catch ex As Exception
+            MessageBox.Show("Error fetching files from GitHub: " & ex.Message)
+        End Try
+
+        Dim finalHtml As String = htmlTemplate.Replace("/*STORE_DATA_PLACEHOLDER*/", jsonData)
+        webView.CoreWebView2.NavigateToString(finalHtml)
+    End Function
+
+    ' Handle actions coming from JavaScript (Saves or Scans)
+    Public Async Sub HandleWebAction(msg As String)
+        If Me.InvokeRequired Then
+            Me.Invoke(New Action(Sub() HandleWebAction(msg)))
+            Return
+        End If
+
+        If msg.StartsWith("SCAN:") Then
+            Dim serial As String = msg.Substring(5)
+            ShowScannedItemPopup(serial)
+        ElseIf msg.StartsWith("SAVE_JSON:") Then
+            Dim updatedJson As String = msg.Substring(10)
+            Await SaveDataToGitHub(updatedJson)
+        End If
+    End Sub
+
+    ' Smart Scan Pop-up Window
+    Private Sub ShowScannedItemPopup(serial As String)
+        If activePopup IsNot Nothing AndAlso Not activePopup.IsDisposed Then
+            activePopup.Close()
+        End If
+
+        activePopup = New Form() With {
+            .Size = New Size(420, 260),
+            .StartPosition = FormStartPosition.CenterScreen,
+            .FormBorderStyle = FormBorderStyle.FixedToolWindow,
+            .TopMost = True,
+            .Text = "Scanned Item Result"
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { display: flex; height: 100vh; background-color: var(--bg-color); color: var(--text-main); overflow: hidden; }
+        Dim popWebView As New WebView2() With {.Dock = DockStyle.Fill}
+        activePopup.Controls.Add(popWebView)
 
-        /* Sidebar Styling */
-        .sidebar { width: 280px; background-color: var(--primary); color: white; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 4px 0 10px rgba(0,0,0,0.05); z-index: 10; }
-        .sidebar-header { padding: 20px; background: rgba(0,0,0,0.1); border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .sidebar-header h3 { font-size: 1.1rem; letter-spacing: 0.5px; text-transform: uppercase; color: #cbd5e1; }
-        .sidebar-header h2 { font-size: 1.3rem; margin-top: 5px; color: #fff; }
-        
-        .category-list { padding: 15px; overflow-y: auto; flex: 1; }
-        .category-item { display: flex; align-items: center; background: rgba(255,255,255,0.03); margin-bottom: 8px; border-radius: 6px; overflow: hidden; transition: all 0.2s ease; border: 1px solid transparent; }
-        .category-item:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.1); }
-        .category-item.active { background: var(--accent); border-color: transparent; }
-        
-        .category-btn { flex: 1; padding: 12px 15px; background: transparent; color: white; border: none; text-align: left; cursor: pointer; font-weight: 600; font-size: 0.95rem; }
-        .delete-cat-btn { background: transparent; border: none; color: #ff8787; padding: 10px 12px; cursor: pointer; transition: color 0.2s; font-size: 1rem; }
-        .delete-cat-btn:hover { color: #ff6b6b; background: rgba(231, 76, 60, 0.2); }
+        AddHandler activePopup.Shown, Async Sub(s, ev)
+                                          Await popWebView.EnsureCoreWebView2Async()
+                                          popWebView.CoreWebView2.NavigateToString($"
+                <!DOCTYPE html>
+                <html>
+                <body style='font-family: Arial; text-align: center; padding-top: 30px; background: #f9f9f9;'>
+                    <h3 style='color: #2c3e50; margin: 0;'>Scanned Barcode</h3>
+                    <p style='font-size: 18px; color: #e74c3c; font-weight: bold; margin: 10px 0;'>{serial}</p>
+                    <p style='color: #7f8c8d; font-size: 13px;'>This popup will close automatically in 5 seconds.</p>
+                </body>
+                </html>")
+                                      End Sub
 
-        .sidebar-footer { padding: 15px; background: rgba(0,0,0,0.15); border-top: 1px solid rgba(255,255,255,0.05); }
-        .admin-btn { background: var(--success); width: 100%; padding: 11px; margin-bottom: 8px; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: background 0.2s; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .admin-btn:hover { opacity: 0.9; }
-        .btn-logout { background: #64748b; }
+        Dim timer As New Timer() With {.Interval = 5000}
+        AddHandler timer.Tick, Sub(s, ev)
+                                   timer.Stop()
+                                   If activePopup IsNot Nothing AndAlso Not activePopup.IsDisposed Then
+                                       activePopup.Close()
+                                   End If
+                               End Sub
+        timer.Start()
+        activePopup.Show()
+    End Sub
 
-        /* Main Workspace */
-        .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-        .top-bar { padding: 15px 25px; background: white; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-        
-        .search-box { position: relative; width: 400px; }
-        .search-box input { width: 100%; padding: 10px 15px 10px 38px; font-size: 0.95rem; border: 1px solid var(--border); border-radius: 6px; outline: none; transition: border-color 0.2s; background: #f8fafc; }
-        .search-box input:focus { border-color: var(--accent); background: white; box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1); }
-        .search-box svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; fill: var(--text-muted); }
+    ' Save data.json online to GitHub
+    Private Async Function SaveDataToGitHub(jsonContent As String) As Task
+        Try
+            Using client As New HttpClient()
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("VB.NET-POS-App")
+                client.DefaultRequestHeaders.Authorization = New System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", GITHUB_TOKEN)
 
-        .user-badge { display: flex; align-items: center; gap: 10px; font-size: 0.95rem; background: #f1f5f9; padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border); font-weight: 500; }
-        .user-badge span { color: var(--accent); font-weight: 700; }
+                Dim getUrl As String = $"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/data.json"
+                Dim getResponse As String = Await client.GetStringAsync(getUrl)
+                Dim jsonDoc = Newtonsoft.Json.Linq.JObject.Parse(getResponse)
+                Dim sha As String = jsonDoc("sha").ToString()
 
-        /* Items Grid Area */
-        .content-area { flex: 1; padding: 25px; overflow-y: auto; }
-        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .section-header h2 { font-size: 1.4rem; color: var(--primary); }
-        .item-count { font-size: 0.9rem; color: var(--text-muted); background: #e2e8f0; padding: 4px 10px; border-radius: 12px; font-weight: 600; }
+                Dim base64Content As String = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(jsonContent))
+                Dim payload = New Newtonsoft.Json.Linq.JObject()
+                payload("message") = "Update inventory via POS App"
+                payload("content") = base64Content
+                payload("sha") = sha
 
-        .items-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 20px; }
-        .item-card { background: var(--card-bg); padding: 18px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); border: 1px solid var(--border); transition: transform 0.15s ease, box-shadow 0.15s ease; display: flex; flex-direction: column; justify-content: space-between; position: relative; }
-        .item-card:hover { transform: translateY(-3px); box-shadow: 0 6px 15px rgba(0,0,0,0.08); border-color: #cbd5e1; }
+                Dim content = New StringContent(payload.ToString(), System.Text.Encoding.UTF8, "application/json")
+                Dim putResponse = Await client.PutAsync(getUrl, content)
 
-        .item-info h4 { font-size: 1.05rem; color: var(--primary); margin-bottom: 6px; font-weight: 600; }
-        .item-serial { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px; display: inline-block; background: #f8fafc; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); }
-        
-        .price-container { margin-top: 5px; margin-bottom: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
-        .price-usd { font-size: 1.2rem; font-weight: 700; color: var(--danger); }
-        .price-ll { font-size: 0.9rem; font-weight: 600; color: var(--success); margin-top: 2px; }
-
-        .action-row { display: flex; gap: 8px; margin-top: auto; }
-        .btn-action { flex: 1; padding: 7px 10px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; font-size: 0.85rem; transition: opacity 0.2s; }
-        .btn-edit { background: #38bdf8; color: white; }
-        .btn-delete { background: #f87171; color: white; }
-        .btn-action:hover { opacity: 0.85; }
-
-        .empty-state { grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--text-muted); background: white; border-radius: 10px; border: 1px dashed var(--border); }
-        .empty-state h3 { font-size: 1.2rem; margin-bottom: 8px; color: var(--primary); }
-
-        /* Modal Backdrop & Box */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; backdrop-filter: blur(2px); }
-        .modal-overlay.active { opacity: 1; pointer-events: auto; }
-        .modal-card { background: white; width: 400px; padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); transform: translateY(-10px); transition: transform 0.2s ease; }
-        .modal-overlay.active .modal-card { transform: translateY(0); }
-        .modal-card h3 { margin-bottom: 15px; color: var(--primary); font-size: 1.2rem; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 5px; color: var(--primary-light); }
-        .form-group input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; outline: none; }
-        .form-group input:focus { border-color: var(--accent); }
-        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-        .modal-btn { padding: 9px 16px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; font-size: 0.9rem; }
-        .modal-btn-cancel { background: #e2e8f0; color: var(--text-main); }
-        .modal-btn-save { background: var(--accent); color: white; }
-    </style>
-</head>
-<body>
-
-    <div class='sidebar'>
-        <div>
-            <div class='sidebar-header'>
-                <h3 id='sidebar-role-title'>POS System</h3>
-                <h2 id='sidebar-category-heading'>Categories</h2>
-            </div>
-            <div class='category-list' id='category-list'></div>
-        </div>
-        <div class='sidebar-footer'>
-            <div id='admin-section'></div>
-            <button class='admin-btn btn-logout' onclick='window.location.reload()'>
-                Logout Session
-            </button>
-        </div>
-    </div>
-
-    <div class='main'>
-        <div class='top-bar'>
-            <div class='search-box'>
-                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                <input type='text' id='scanner-input' placeholder='Scan Barcode or Search Items...' autofocus />
-            </div>
-            <div class='user-badge' id='role-display'>Role: Cashier</div>
-        </div>
-
-        <div class='content-area'>
-            <div class='section-header'>
-                <h2 id='current-category-name'>Select a Category</h2>
-                <span class='item-count' id='item-count-badge'>0 items</span>
-            </div>
-            <div id='items-container' class='items-grid'></div>
-        </div>
-    </div>
-
-    <div class='modal-overlay' id='modal-overlay'>
-        <div class='modal-card' id='modal-card-content'>
-            <h3 id='modal-title'>Modal Title</h3>
-            <div id='modal-body'></div>
-            <div class='modal-actions'>
-                <button class='modal-btn modal-btn-cancel' onclick='closeModal()'>Cancel</button>
-                <button class='modal-btn modal-btn-save' id='modal-save-btn'>Save</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        let storeData = /*STORE_DATA_PLACEHOLDER*/;
-        const currentRole = /*ROLE_PLACEHOLDER*/;
-        const isAdmin = (currentRole === 'Admin');
-        let currentCatIndex = 0;
-        let searchQuery = '';
-
-        document.getElementById('sidebar-role-title').innerText = `POS Portal (${currentRole})`;
-        document.getElementById('role-display').innerHTML = `Active Role: <span>${currentRole}</span>`;
-
-        if(isAdmin) {
-            document.getElementById('admin-section').innerHTML = `
-                <button class='admin-btn' onclick='openAddCategoryModal()'>Add Category</button>
-                <button class='admin-btn' style='background: #e67e22;' onclick='openAddItemModal()'>Add Item</button>
-            `;
-        }
-        
-        function renderCategories() {
-            const list = document.getElementById('category-list');
-            list.innerHTML = '';
-            if(!storeData.categories) storeData.categories = [];
-            
-            storeData.categories.forEach((cat, index) => {
-                const wrapper = document.createElement('div');
-                wrapper.className = `category-item ${index === currentCatIndex ? 'active' : ''}`;
-                
-                const btn = document.createElement('button');
-                btn.className = 'category-btn';
-                btn.innerText = cat.name;
-                btn.onclick = () => { currentCatIndex = index; searchQuery = ''; document.getElementById('scanner-input').value = ''; renderCategories(); };
-                wrapper.appendChild(btn);
-
-                if(isAdmin) {
-                    const delCat = document.createElement('button');
-                    delCat.className = 'delete-cat-btn';
-                    delCat.innerHTML = '🗑';
-                    delCat.title = 'Delete Category';
-                    delCat.onclick = (e) => { e.stopPropagation(); deleteCategory(index); };
-                    wrapper.appendChild(delCat);
-                }
-
-                list.appendChild(wrapper);
-            });
-
-            if(storeData.categories.length > 0) {
-                if(currentCatIndex >= storeData.categories.length) currentCatIndex = 0;
-                renderItems();
-            } else {
-                document.getElementById('current-category-name').innerText = "No Categories Available";
-                document.getElementById('item-count-badge').innerText = "0 items";
-                document.getElementById('items-container').innerHTML = `
-                    <div class='empty-state'>
-                        <h3>No Inventory Found</h3>
-                        <p>${isAdmin ? 'Use the sidebar buttons to create categories and add products.' : 'Please wait for the administrator to add inventory.'}</p>
-                    </div>`;
-            }
-        }
-
-        function renderItems() {
-            const container = document.getElementById('items-container');
-            container.innerHTML = '';
-            
-            if(storeData.categories.length === 0) return;
-
-            const cat = storeData.categories[currentCatIndex];
-            document.getElementById('current-category-name').innerText = cat.name;
-            
-            const items = cat.items || [];
-            const filteredItems = items.filter(item => 
-                item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                item.serial.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-
-            document.getElementById('item-count-badge').innerText = `${filteredItems.length} item${filteredItems.length === 1 ? '' : 's'}`;
-
-            if(filteredItems.length === 0) {
-                container.innerHTML = `
-                    <div class='empty-state'>
-                        <h3>No Products Found</h3>
-                        <p>${searchQuery ? 'No items match your search query.' : 'This category is currently empty.'}</p>
-                    </div>`;
-                return;
-            }
-
-            filteredItems.forEach((item) => {
-                const itemIndex = items.findIndex(i => i.serial === item.serial);
-                const card = document.createElement('div');
-                card.className = 'item-card';
-                
-                let priceHTML = `<div class='price-usd'>$${item.priceUSD.toFixed(2)}</div>`;
-                if(item.priceLL && item.priceLL > 0) {
-                    priceHTML += `<div class='price-ll'>L.L. ${item.priceLL.toLocaleString()}</div>`;
-                }
-                
-                let adminControls = '';
-                if(isAdmin) {
-                    adminControls = `
-                        <div class='action-row'>
-                            <button class='btn-action btn-edit' onclick='openEditItemModal(${currentCatIndex}, ${itemIndex})'>Edit</button>
-                            <button class='btn-action btn-delete' onclick='deleteItem(${currentCatIndex}, ${itemIndex})'>Delete</button>
-                        </div>
-                    `;
-                }
-
-                card.innerHTML = `
-                    <div class='item-info'>
-                        <h4>${item.name}</h4>
-                        <span class='item-serial'>SN: ${item.serial}</span>
-                        <div class='price-container'>${priceHTML}</div>
-                    </div>
-                    ${adminControls}
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        const modalOverlay = document.getElementById('modal-overlay');
-        function showModal(title, bodyHTML, onSave) {
-            document.getElementById('modal-title').innerText = title;
-            document.getElementById('modal-body').innerHTML = bodyHTML;
-            const saveBtn = document.getElementById('modal-save-btn');
-            saveBtn.onclick = () => { if(onSave()) closeModal(); };
-            modalOverlay.classList.add('active');
-        }
-        function closeModal() { modalOverlay.classList.remove('active'); }
-
-        function openAddCategoryModal() {
-            showModal('Add New Category', `
-                <div class='form-group'>
-                    <label>Category Name</label>
-                    <input type='text' id='modal-cat-name' placeholder='e.g., Beverages' autofocus />
-                </div>
-            `, () => {
-                const name = document.getElementById('modal-cat-name').value.trim();
-                if(name) {
-                    storeData.categories.push({ id: 'cat_' + Date.now(), name: name, items: [] });
-                    currentCatIndex = storeData.categories.length - 1;
-                    syncToGitHub();
-                    return true;
-                }
-                alert('Please enter a valid category name.');
-                return false;
-            });
-        }
-
-        function openAddItemModal() {
-            if(storeData.categories.length === 0) { alert('Please create a category first!'); return; }
-            showModal('Add New Product', `
-                <div class='form-group'><label>Barcode / Serial</label><input type='text' id='modal-item-serial' autofocus /></div>
-                <div class='form-group'><label>Product Name</label><input type='text' id='modal-item-name' /></div>
-                <div class='form-group'><label>Price USD ($)</label><input type='number' step='0.01' id='modal-item-usd' /></div>
-                <div class='form-group'><label>Price L.L. (Optional)</label><input type='number' id='modal-item-ll' value='0' /></div>
-            `, () => {
-                const serial = document.getElementById('modal-item-serial').value.trim();
-                const name = document.getElementById('modal-item-name').value.trim();
-                const priceUSD = parseFloat(document.getElementById('modal-item-usd').value);
-                const priceLL = parseFloat(document.getElementById('modal-item-ll').value) || 0;
-
-                if(serial && name && !isNaN(priceUSD)) {
-                    if(!storeData.categories[currentCatIndex].items) storeData.categories[currentCatIndex].items = [];
-                    storeData.categories[currentCatIndex].items.push({ serial, name, priceUSD, priceLL: priceLL > 0 ? priceLL : 0 });
-                    syncToGitHub();
-                    return true;
-                }
-                alert('Please fill in required fields.');
-                return false;
-            });
-        }
-
-        function openEditItemModal(catIndex, itemIndex) {
-            const item = storeData.categories[catIndex].items[itemIndex];
-            showModal('Edit Product', `
-                <div class='form-group'><label>Product Name</label><input type='text' id='modal-edit-name' value='${item.name}' /></div>
-                <div class='form-group'><label>Price USD ($)</label><input type='number' step='0.01' id='modal-edit-usd' value='${item.priceUSD}' /></div>
-                <div class='form-group'><label>Price L.L.</label><input type='number' id='modal-edit-ll' value='${item.priceLL || 0}' /></div>
-            `, () => {
-                const newName = document.getElementById('modal-edit-name').value.trim();
-                const newUSD = parseFloat(document.getElementById('modal-edit-usd').value);
-                const newLL = parseFloat(document.getElementById('modal-edit-ll').value) || 0;
-
-                if(newName && !isNaN(newUSD)) {
-                    item.name = newName;
-                    item.priceUSD = newUSD;
-                    item.priceLL = newLL > 0 ? newLL : 0;
-                    syncToGitHub();
-                    return true;
-                }
-                alert('Invalid values.');
-                return false;
-            });
-        }
-
-        function deleteCategory(catIndex) {
-            if(confirm('Delete this category and its items?')) {
-                storeData.categories.splice(catIndex, 1);
-                if(currentCatIndex >= storeData.categories.length) currentCatIndex = Math.max(0, storeData.categories.length - 1);
-                syncToGitHub();
-            }
-        }
-
-        function deleteItem(catIndex, itemIndex) {
-            if(confirm('Delete this product?')) {
-                storeData.categories[catIndex].items.splice(itemIndex, 1);
-                syncToGitHub();
-            }
-        }
-
-        function syncToGitHub() {
-            // Secure native bridge connection to VB.NET
-            if (window.chrome && window.chrome.webview && window.chrome.webview.hostObjects && window.chrome.webview.hostObjects.nativeBridge) {
-                window.chrome.webview.hostObjects.nativeBridge.PostMessage('SAVE_JSON:' + JSON.stringify(storeData, null, 2));
-            }
-        }
-
-        const input = document.getElementById('scanner-input');
-        input.addEventListener('input', (e) => {
-            searchQuery = e.target.value.trim();
-            renderItems();
-        });
-
-        input.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                const val = input.value.trim();
-                if(val) {
-                    if (window.chrome && window.chrome.webview && window.chrome.webview.hostObjects && window.chrome.webview.hostObjects.nativeBridge) {
-                        window.chrome.webview.hostObjects.nativeBridge.PostMessage('SCAN:' + val);
-                    }
-                    input.value = '';
-                    searchQuery = '';
-                    renderItems();
-                }
-            }
-        });
-
-        renderCategories();
-    </script>
-</body>
-</html>
+                If putResponse.IsSuccessStatusCode Then
+                    MessageBox.Show("Changes saved and synced to GitHub successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Else
+                    MessageBox.Show("Failed to sync with GitHub: " & Await putResponse.Content.ReadAsStringAsync())
+                End If
+            End Using
+        Catch ex As Exception
+            MessageBox.Show("Error saving to GitHub: " & ex.Message)
+        End Try
+    End Function
+End Class
