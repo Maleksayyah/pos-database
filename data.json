@@ -7,8 +7,14 @@
         {
           "serial": "111222333",
           "name": "Sample Product",
-          "priceUSD": 53,
+          "priceUSD": 52,
           "priceLL": 450000
+        },
+        {
+          "serial": "2508SMJ01076",
+          "name": "test1",
+          "priceUSD": 4,
+          "priceLL": 0
         }
       ]
     }
