@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>POS System</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; display: flex; height: 100vh; background: #eef2f5; }
+        .sidebar { width: 260px; background: #2c3e50; color: white; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; justify-content: space-between; }
+        .main { flex: 1; padding: 20px; overflow-y: auto; }
+        .category-item { display: flex; justify-content: space-between; align-items: center; background: #34495e; margin-bottom: 8px; border-radius: 4px; overflow: hidden; }
+        .category-btn { flex: 1; padding: 10px; background: transparent; color: white; border: none; text-align: left; cursor: pointer; font-weight: bold; }
+        .category-btn:hover { background: #1abc9c; }
+        .items-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 15px; }
+        .item-card { background: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; position: relative; }
+        .price { color: #e74c3c; font-weight: bold; margin-top: 5px; font-size: 15px; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        input[type='text'] { padding: 10px; width: 350px; font-size: 15px; border: 1px solid #ccc; border-radius: 4px; }
+        .admin-tools { border-top: 1px solid #4f5b66; padding-top: 15px; margin-top: 15px; }
+        .admin-btn { background: #e67e22; width: 100%; padding: 10px; margin-bottom: 8px; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .admin-btn:hover { background: #d35400; }
+        .action-row { margin-top: 10px; display: flex; gap: 5px; justify-content: center; }
+        .edit-price-btn { background: #2980b9; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; }
+        .delete-item-btn { background: #c0392b; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; }
+        .delete-cat-btn { background: #c0392b; color: white; border: none; padding: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class='sidebar'>
+        <div>
+            <h3 id='sidebar-title'>Categories</h3>
+            <div id='category-list'></div>
+        </div>
+        <div>
+            <div id='admin-section'></div>
+            <button class='admin-btn' style='background: #7f8c8d; margin-top:10px;' onclick='window.location.reload()'>Logout</button>
+        </div>
+    </div>
+    <div class='main'>
+        <div class='top-bar'>
+            <input type='text' id='scanner-input' placeholder='Scan Barcode or Search Item...' autofocus />
+            <div id='role-display'></div>
+        </div>
+        <div id='items-container' class='items-grid'></div>
+    </div>
+
+    <script>
+        let storeData = /*STORE_DATA_PLACEHOLDER*/;
+        const currentRole = /*ROLE_PLACEHOLDER*/;
+        const isAdmin = (currentRole === 'Admin');
+        let currentCatIndex = 0;
+
+        document.getElementById('sidebar-title').innerText = `Categories (${currentRole})`;
+        document.getElementById('role-display').innerHTML = `<b>Role:</b> ${currentRole}`;
+
+        if(isAdmin) {
+            document.getElementById('admin-section').innerHTML = `
+                <div class='admin-tools'>
+                    <button class='admin-btn' onclick='addCategory()'>+ Add Category</button>
+                    <button class='admin-btn' onclick='addItem()'>+ Add Item</button>
+                </div>
+            `;
+        }
+        
+        function renderCategories() {
+            const list = document.getElementById('category-list');
+            list.innerHTML = '';
+            if(!storeData.categories) storeData.categories = [];
+            
+            storeData.categories.forEach((cat, index) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'category-item';
+                
+                const btn = document.createElement('button');
+                btn.className = 'category-btn';
+                btn.innerText = cat.name;
+                btn.onclick = () => { currentCatIndex = index; renderItems(index); };
+                wrapper.appendChild(btn);
+
+                if(isAdmin) {
+                    const delCat = document.createElement('button');
+                    delCat.className = 'delete-cat-btn';
+                    delCat.innerHTML = '🗑️';
+                    delCat.title = 'Delete Category';
+                    delCat.onclick = () => deleteCategory(index);
+                    wrapper.appendChild(delCat);
+                }
+
+                list.appendChild(wrapper);
+            });
+            if(storeData.categories.length > 0) {
+                if(currentCatIndex >= storeData.categories.length) currentCatIndex = 0;
+                renderItems(currentCatIndex);
+            } else {
+                document.getElementById('items-container').innerHTML = '<p>No items found. Create a category to start.</p>';
+            }
+        }
+
+        function renderItems(catIndex) {
+            const container = document.getElementById('items-container');
+            container.innerHTML = '';
+            const items = storeData.categories[catIndex].items || [];
+            
+            if(items.length === 0) {
+                container.innerHTML = '<p>No items in this category.</p>';
+                return;
+            }
+
+            items.forEach((item, itemIndex) => {
+                const card = document.createElement('div');
+                card.className = 'item-card';
+                
+                let priceText = `$${item.priceUSD.toFixed(2)}`;
+                if(item.priceLL && item.priceLL > 0) {
+                    priceText += ` / L.L. ${item.priceLL.toLocaleString()}`;
+                }
+                
+                let adminControls = '';
+                if(isAdmin) {
+                    adminControls = `
+                        <div class='action-row'>
+                            <button class='edit-price-btn' onclick='editItem(${catIndex}, ${itemIndex})'>Edit</button>
+                            <button class='delete-item-btn' onclick='deleteItem(${catIndex}, ${itemIndex})'>Delete</button>
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <h4>${item.name}</h4>
+                    <div class='price'>${priceText}</div>
+                    <small style='color:#666;'>Serial: ${item.serial}</small>
+                    ${adminControls}
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function addCategory() {
+            const name = prompt('Enter new category name:');
+            if(name) {
+                storeData.categories.push({ id: 'cat_' + Date.now(), name: name, items: [] });
+                syncToGitHub();
+            }
+        }
+
+        function deleteCategory(catIndex) {
+            if(confirm('Delete category and all its items?')) {
+                storeData.categories.splice(catIndex, 1);
+                syncToGitHub();
+            }
+        }
+
+        function addItem() {
+            if(storeData.categories.length === 0) { alert('Please create a category first!'); return; }
+            const serial = prompt('Enter Barcode / Serial Number:');
+            if(!serial) return;
+            const name = prompt('Enter Item Name:');
+            if(!name) return;
+            const priceUSD = parseFloat(prompt('Enter Price in USD:', '0'));
+            const priceLL = parseFloat(prompt('Enter Price in L.L. (Leave 0 if not used):', '0'));
+
+            if(!isNaN(priceUSD)) {
+                if(!storeData.categories[currentCatIndex].items) {
+                    storeData.categories[currentCatIndex].items = [];
+                }
+                storeData.categories[currentCatIndex].items.push({
+                    serial: serial.trim(),
+                    name: name.trim(),
+                    priceUSD: priceUSD,
+                    priceLL: priceLL > 0 ? priceLL : 0
+                });
+                syncToGitHub();
+            }
+        }
+
+        function editItem(catIndex, itemIndex) {
+            const item = storeData.categories[catIndex].items[itemIndex];
+            const newName = prompt('Edit Item Name:', item.name);
+            if(newName === null) return;
+            const newUSD = prompt('Edit Price USD:', item.priceUSD);
+            if(newUSD === null) return;
+            const newLL = prompt('Edit Price L.L.:', item.priceLL || 0);
+            if(newLL === null) return;
+
+            item.name = newName.trim();
+            item.priceUSD = parseFloat(newUSD);
+            item.priceLL = parseFloat(newLL);
+            syncToGitHub();
+        }
+
+        function deleteItem(catIndex, itemIndex) {
+            if(confirm('Are you sure you want to delete this item?')) {
+                storeData.categories[catIndex].items.splice(itemIndex, 1);
+                syncToGitHub();
+            }
+        }
+
+        function syncToGitHub() {
+            window.chrome.webview.postMessage('SAVE_JSON:' + JSON.stringify(storeData, null, 2));
+        }
+
+        const input = document.getElementById('scanner-input');
+        input.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                const val = input.value.trim();
+                if(val) {
+                    window.chrome.webview.postMessage('SCAN:' + val);
+                    input.value = '';
+                }
+            }
+        });
+
+        renderCategories();
+    </script>
+</body>
+</html>
