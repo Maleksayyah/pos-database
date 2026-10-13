@@ -85,6 +85,7 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
 .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:100%;max-width:400px;padding:20px;box-shadow:var(--shadow)}
 .modal h3{font-size:1.15rem;margin-bottom:14px;color:#fff;font-weight:600}
 .fg{margin-bottom:12px}.fg label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase}
+.fg select{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:1rem;color:var(--ink)}
 .fg input{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:1rem}
 .m-act{display:flex;justify-content:space-between;align-items:center;margin-top:16px}
 .m-err{color:var(--danger);font-size:.8rem;min-height:1.2em;margin-top:6px}
@@ -244,7 +245,7 @@ const SUPABASE_URL = "https://kkmfhvuwanzugffmytlg.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_pYeJwa6OZPeKW8fI34I7bQ_WdUs5Bfb";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let store = { categories: [] }, admin = false, cat = 0, query = '', sel = new Set();
+let store = { categories: [] }, admin = false, cat = 0, showAll = true, query = '', sel = new Set();
 let scanT = null, toastT = null, dataReady = Promise.resolve();
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -302,8 +303,10 @@ window.addEventListener('DOMContentLoaded', () => {
 function render() { renderCats(); renderItems(); renderSel(); }
 function renderCats() {
   if (cat >= store.categories.length) cat = 0;
-  $('cats').innerHTML = store.categories.map((c, i) => `
-    <div class="cat ${i === cat && !query ? 'on' : ''}">
+  const total = store.categories.reduce((n, c) => n + (c.items || []).length, 0);
+  const allBtn = `<div class="cat ${showAll && !query ? 'on' : ''}"><button class="cat-btn" data-all="1">All<i>${total}</i></button></div>`;
+  $('cats').innerHTML = allBtn + store.categories.map((c, i) => `
+    <div class="cat ${!showAll && i === cat && !query ? 'on' : ''}">
       <button class="cat-btn" data-i="${i}">${esc(c.name)}<i>${(c.items || []).length}</i></button>
       ${admin ? `<button class="cat-del" data-delcat="${i}" title="Delete">&times;</button>` : ''}
     </div>`).join('');
@@ -317,6 +320,11 @@ function visibleItems() {
     }));
     return out;
   }
+  if (showAll) {
+    const out = [];
+    store.categories.forEach((c, ci) => (c.items || []).forEach(it => out.push({ it, ci })));
+    return out;
+  }
   const c = store.categories[cat];
   return c ? (c.items || []).map(it => ({ it, ci: cat })) : [];
 }
@@ -328,7 +336,7 @@ function renderItems() {
     return;
   }
   const list = visibleItems();
-  $('title').textContent = query ? 'Results' : store.categories[cat].name;
+  $('title').textContent = query ? 'Results' : showAll ? 'All items' : store.categories[cat].name;
   $('count').textContent = list.length + (list.length === 1 ? ' item' : ' items');
   if (!list.length) {
     g.innerHTML = `<div class="empty"><h3>No items found</h3><p>${query ? 'Check search term.' : ''}</p></div>`;
@@ -340,7 +348,7 @@ function renderItems() {
       <div class="sn">${esc(it.serial)}</div>
       <div class="ll num">${ll(it.priceLL)}</div>
       <div class="usd num">${usd(it.priceUSD)}</div>
-      ${query ? `<div class="cat-tag">${esc(store.categories[ci].name)}</div>` : ''}
+      ${query || showAll ? `<div class="cat-tag">${esc(store.categories[ci].name)}</div>` : ''}
       ${admin ? `<div class="acts"><button data-edit>Edit</button><button class="del" data-del>Del</button></div>` : ''}
     </article>`).join('');
 }
@@ -506,23 +514,24 @@ async function addCategory() {
     const { error } = await supabaseClient.from('categories').insert([{ id, name }]);
     if (error) { showToast(error.message, true); return error.message; }
     store.categories.push({ id, name, items: [] });
-    cat = store.categories.length - 1; query = ''; $('q').value = '';
+    showAll = false; cat = store.categories.length - 1; query = ''; $('q').value = '';
     render(); closeModal(); showToast('Category added!');
   });
 }
 async function addItem() {
   if (!store.categories.length) return showToast('Create a category first.', true);
   openModal('Add Product',
+    `<div class="fg"><label for="f-cat">Category</label><select id="f-cat">${store.categories.map((c, i) => `<option value="${i}" ${i === cat ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>` +
     '<div class="fg"><label for="f-serial">Barcode / Serial</label><div style="display:flex;gap:8px"><input id="f-serial" type="text" style="flex:1;min-width:0;width:auto"><button type="button" class="btn" id="f-cam" style="padding:0 16px;font-size:1.3rem" title="Scan barcode with camera">📸</button></div></div>' + field('f-name', 'Product Name') +
     field('f-usd', 'Price (USD)', 'number', '', 'step="0.01" min="0"') + field('f-ll', 'Price (L.L.)', 'number', '0', 'min="0"'), async () => {
     const serial = $('f-serial').value.trim(), name = $('f-name').value.trim();
     const price_usd = parseFloat($('f-usd').value), price_ll = parseFloat($('f-ll').value) || 0;
     if (!serial || !name || isNaN(price_usd)) return 'Fields required.';
     showToast('Saving...', false, true);
-    const category_id = store.categories[cat].id;
+    const ci = +$('f-cat').value, category_id = store.categories[ci].id;
     const { error } = await supabaseClient.from('items').insert([{ serial, category_id, name, price_usd, price_ll }]);
     if (error) { showToast(error.message, true); return error.message; }
-    (store.categories[cat].items = store.categories[cat].items || []).push({ serial, name, priceUSD: price_usd, priceLL: price_ll });
+    (store.categories[ci].items = store.categories[ci].items || []).push({ serial, name, priceUSD: price_usd, priceLL: price_ll });
     render(); closeModal(); showToast('Product added!');
   });
   $('f-cam').addEventListener('click', () => $('f-photo-add').click());
@@ -577,8 +586,9 @@ $('close-menu').addEventListener('click', closeDrawer); $('drawer-backdrop').add
 $('cats').addEventListener('click', e => {
   const d = e.target.closest('[data-delcat]');
   if (d) return delCat(+d.dataset.delcat);
+  if (e.target.closest('[data-all]')) { showAll = true; query = ''; $('q').value = ''; render(); closeDrawer(); return; }
   const b = e.target.closest('[data-i]');
-  if (b) { cat = +b.dataset.i; query = ''; $('q').value = ''; render(); closeDrawer(); }
+  if (b) { showAll = false; cat = +b.dataset.i; query = ''; $('q').value = ''; render(); closeDrawer(); }
 });
 function toggle(serial) { sel.has(serial) ? sel.delete(serial) : sel.add(serial); renderItems(); renderSel(); }
 $('grid').addEventListener('click', e => {
