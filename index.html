@@ -236,6 +236,7 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
   </div>
 </div>
 
+<input type="file" id="f-photo-add" accept="image/*" capture="environment" class="hidden">
 <div id="toast"><span class="spin hidden" id="t-spin"></span><span id="t-text"></span></div>
 
 <script>
@@ -441,9 +442,7 @@ async function detectIn(source, det) {
   const codes = await det.detect(source);
   return codes.length ? codes[0].rawValue : null;
 }
-async function decodeFile(file) {
-  if (!file) return;
-  showToast('Reading photo…', false, true);
+async function readBarcode(file) {
   let text = null;
   try {
     if ('BarcodeDetector' in window) {
@@ -463,7 +462,13 @@ async function decodeFile(file) {
       const hq = new Html5Qrcode('hq', { verbose: false });
       try { text = await hq.scanFile(file, false); } catch (_) {}
     }
-  } catch (e) { console.warn('decodeFile', e); }
+  } catch (e) { console.warn('readBarcode', e); }
+  return text;
+}
+async function decodeFile(file) {
+  if (!file) return;
+  showToast('Reading photo…', false, true);
+  const text = await readBarcode(file);
   $('toast').classList.remove('show');
   if (text) showResult(text);
   else {
@@ -474,6 +479,16 @@ async function decodeFile(file) {
 }
 
 $('f-photo').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; decodeFile(f); });
+$('f-photo-add').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  showToast('Reading photo…', false, true);
+  const t = await readBarcode(f);
+  $('toast').classList.remove('show');
+  const el = $('f-serial');
+  if (t && el) { el.value = t; beep(); showToast('Barcode added'); const n = $('f-name'); if (n) n.focus(); }
+  else showToast('No barcode found. Try again closer, flat and well lit.', true);
+});
 $('sc-shoot').addEventListener('click', () => $('f-photo').click());
 $('sc-back').addEventListener('click', closeScanner);
 $('open-cam').addEventListener('click', () => openScanner('app'));
@@ -498,7 +513,7 @@ async function addCategory() {
 async function addItem() {
   if (!store.categories.length) return showToast('Create a category first.', true);
   openModal('Add Product',
-    field('f-serial', 'Barcode / Serial') + field('f-name', 'Product Name') +
+    '<div class="fg"><label for="f-serial">Barcode / Serial</label><div style="display:flex;gap:8px"><input id="f-serial" type="text" style="flex:1;min-width:0;width:auto"><button type="button" class="btn" id="f-cam" style="padding:0 16px;font-size:1.3rem" title="Scan barcode with camera">📸</button></div></div>' + field('f-name', 'Product Name') +
     field('f-usd', 'Price (USD)', 'number', '', 'step="0.01" min="0"') + field('f-ll', 'Price (L.L.)', 'number', '0', 'min="0"'), async () => {
     const serial = $('f-serial').value.trim(), name = $('f-name').value.trim();
     const price_usd = parseFloat($('f-usd').value), price_ll = parseFloat($('f-ll').value) || 0;
@@ -510,6 +525,7 @@ async function addItem() {
     (store.categories[cat].items = store.categories[cat].items || []).push({ serial, name, priceUSD: price_usd, priceLL: price_ll });
     render(); closeModal(); showToast('Product added!');
   });
+  $('f-cam').addEventListener('click', () => $('f-photo-add').click());
 }
 async function editItem(ci, serial) {
   const item = (store.categories[ci].items || []).find(i => i.serial === serial);
