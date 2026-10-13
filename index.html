@@ -644,16 +644,50 @@ $('scanpage').addEventListener('touchstart', e => { if (e.touches.length === 2) 
 $('scanpage').addEventListener('touchmove', e => { if (e.touches.length === 2 && pinchD) setZoom(pinchZ * dist(e.touches) / pinchD); }, { passive: true });
 $('scanpage').addEventListener('touchend', () => { pinchD = 0; });
 
-// Tap to refocus
-vid.addEventListener('click', async () => {
-  if (!track) return;
+// Tap to focus (tries every focus method the camera exposes)
+let focusBusy = false;
+function focusRing(x, y, ok) {
+  const r = document.createElement('div');
+  r.style.cssText = 'position:absolute;z-index:6;width:76px;height:76px;margin:-38px 0 0 -38px;border:2px solid ' + (ok ? '#10b981' : '#f59e0b') + ';border-radius:50%;pointer-events:none;transition:all .35s;left:' + x + 'px;top:' + y + 'px;transform:scale(1.5);opacity:1';
+  $('scanpage').appendChild(r);
+  requestAnimationFrame(() => { r.style.transform = 'scale(1)'; });
+  setTimeout(() => { r.style.opacity = '0'; }, 700);
+  setTimeout(() => r.remove(), 1100);
+}
+async function refocus(e) {
+  if (!track || focusBusy) return;
+  const rect = $('scanpage').getBoundingClientRect();
+  const px = e.clientX - rect.left, py = e.clientY - rect.top;
   const caps = track.getCapabilities ? track.getCapabilities() : {};
+  const modes = caps.focusMode || [];
+  const nx = Math.min(1, Math.max(0, e.clientX / innerWidth)), ny = Math.min(1, Math.max(0, e.clientY / innerHeight));
+  focusBusy = true;
+  let ok = false;
   try {
-    if (caps.focusMode && caps.focusMode.includes('single-shot')) {
-      await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
-      setTimeout(() => { if (caps.focusMode.includes('continuous')) track && track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {}); }, 1500);
+    // 1) point of interest + single-shot (best, if supported)
+    if (modes.includes('single-shot')) {
+      try { await track.applyConstraints({ advanced: [{ focusMode: 'single-shot', pointsOfInterest: [{ x: nx, y: ny }] }] }); ok = true; }
+      catch (_) { await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] }); ok = true; }
     }
-  } catch (_) {}
+    // 2) otherwise kick the autofocus: manual -> continuous restarts the AF scan
+    else if (modes.includes('continuous')) {
+      if (modes.includes('manual')) {
+        await track.applyConstraints({ advanced: [{ focusMode: 'manual' }] });
+        await sleep(180);
+      }
+      await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+      ok = true;
+    }
+    // 3) nothing exposed
+    if (!modes.length) showToast('This phone does not let Chrome control focus. Keep the phone ~10–15 cm from the barcode.', true);
+    else if (modes.includes('single-shot')) setTimeout(() => { track && modes.includes('continuous') && track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {}); }, 1800);
+  } catch (err) { console.warn('focus failed', err); ok = false; }
+  focusRing(px, py, ok);
+  setTimeout(() => { focusBusy = false; }, 400);
+}
+$('scanpage').addEventListener('click', e => {
+  if (e.target.closest('button,input,#res,.zoom-row')) return;
+  refocus(e);
 });
 
 // Release camera when the tab is hidden, reopen when back
