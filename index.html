@@ -208,9 +208,8 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
   <div id="sc-status" style="position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);z-index:4;color:#fff;text-align:center;font-weight:600;text-shadow:0 1px 6px #000;display:none"></div>
   <div class="sc-top">
     <button class="circ" id="sc-back" aria-label="Back">←</button>
-    <span class="sc-title">Scan Item</span>
+    <span class="sc-title" id="sc-title">Scan Item</span>
     <div style="display:flex;gap:8px">
-      <button class="circ" id="sc-lens" aria-label="Switch lens" title="Switch lens">🔄</button>
       <button class="circ" id="sc-flash" aria-label="Flash" title="Flash">⚡</button>
     </div>
   </div>
@@ -454,6 +453,31 @@ async function openFirst(deviceId) {
   }
   throw lastErr;
 }
+async function probeBestCam() {
+  // Open each rear camera briefly and score it: the main lens has autofocus + hardware zoom,
+  // the ultra-wide (0.5x) usually has neither.
+  if (rearCams.length < 2) return rearCams[0] ? rearCams[0].id : null;
+  let best = null, bestScore = -1e9;
+  for (let i = 0; i < Math.min(rearCams.length, 5); i++) {
+    const d = rearCams[i];
+    try {
+      const st = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: d.id } }, audio: false });
+      const t = st.getVideoTracks()[0];
+      const c = t.getCapabilities ? t.getCapabilities() : {};
+      let sc = 0;
+      if (c.zoom) sc += 4;
+      if (c.zoom && Number(c.zoom.max) >= 4) sc += 1;
+      if (c.focusMode && c.focusMode.includes('continuous')) sc += 2;
+      if (isSecondaryLens(d.label)) sc -= 5;
+      sc -= i * 0.1;
+      if (sc > bestScore) { bestScore = sc; best = d.id; }
+      st.getTracks().forEach(x => x.stop());
+      await sleep(250);
+    } catch (e) { console.warn('probe failed', d.label, e); await sleep(250); }
+  }
+  return best;
+}
+
 async function startStream(deviceId) {
   stopStream(false);
   setStatus('Starting camera…');
@@ -463,23 +487,29 @@ async function startStream(deviceId) {
     track = stream.getVideoTracks()[0];
     await attachStream();                 // preview shows immediately
 
-    // Upgrade to the MAIN rear lens (facingMode alone may pick the 0.5x ultra-wide)
-    if (!deviceId) {
+    if (!deviceId) {                      // find & switch to the MAIN rear lens (1x)
       await listRearCams();
-      const main = pickMainCam();
       const cur = track.getSettings().deviceId;
-      if (main && main.id !== cur) {
+      let mainId = localStorage.getItem('pos_main_cam');
+      if (!rearCams.some(d => d.id === mainId)) mainId = null;
+      if (!mainId) {
         stream.getTracks().forEach(t => t.stop());
-        await sleep(350);
-        try { stream = await openFirst(main.id); }
-        catch (e) { console.warn('Main lens failed, using default', e); await sleep(300); stream = await openFirst(null); }
+        await sleep(300);
+        mainId = await probeBestCam();
+        if (mainId) localStorage.setItem('pos_main_cam', mainId);
+      } else if (mainId !== cur) {
+        stream.getTracks().forEach(t => t.stop());
+        await sleep(300);
+      }
+      if (!stream.active || mainId !== cur) {
+        try { stream = await openFirst(mainId || null); }
+        catch (e) { console.warn('Main lens failed', e); localStorage.removeItem('pos_main_cam'); await sleep(300); stream = await openFirst(null); }
         track = stream.getVideoTracks()[0];
         await attachStream();
       }
     }
     camId = track.getSettings().deviceId || deviceId;
-    await listRearCams();
-    $('sc-lens').style.display = rearCams.filter(d => d.id !== camId).length ? '' : 'none';
+    $('sc-title').textContent = 'Scan Item' + (track.label ? ' · ' + track.label.replace(/,?\s*facing back/i, '') : '');
     setStatus('');
     await setupCameraControls();
     startDetection();
@@ -494,39 +524,43 @@ async function startStream(deviceId) {
   }
 }
 
+let digitalZoom = false;
+function zoomRange() {
+  if (zoomCaps && !digitalZoom) return { min: Math.max(1, Number(zoomCaps.min) || 1), max: Math.min(Number(zoomCaps.max) || 1, 10), step: Number(zoomCaps.step) || 0.1 };
+  return { min: 1, max: 5, step: 0.1 };
+}
 async function setupCameraControls() {
   torchOn = false; $('sc-flash').classList.remove('on');
   const caps = track.getCapabilities ? track.getCapabilities() : {};
-  // Continuous autofocus
   try {
     if (caps.focusMode && caps.focusMode.includes('continuous'))
       await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
   } catch (_) {}
-  // Zoom: force 1x (never the 0.5x wide view) and expose slider
   zoomCaps = caps.zoom || null;
-  $('zoom-row').style.display = zoomCaps ? 'flex' : 'none';
+  digitalZoom = !zoomCaps;                       // no hardware zoom -> digital zoom fallback
+  vid.style.transform = ''; curZoom = 1;
   $('sc-flash').style.display = caps.torch ? '' : 'none';
-  if (zoomCaps) {
-    const min = Math.max(1, Number(zoomCaps.min) || 1);
-    const max = Number(zoomCaps.max) || min;
-    const s = $('zslider');
-    s.min = min; s.max = Math.min(max, 10); s.step = Number(zoomCaps.step) || 0.1;
-    await setZoom(Math.max(1, min));
-  }
+  $('zoom-row').style.display = 'flex';
+  const r = zoomRange(), sl = $('zslider');
+  sl.min = r.min; sl.max = r.max; sl.step = r.step;
+  await setZoom(1);
 }
-
 async function setZoom(z) {
-  if (!track || !zoomCaps) return;
-  const min = Math.max(1, Number(zoomCaps.min) || 1);
-  const max = Math.min(Number(zoomCaps.max) || min, 10);
-  z = Math.min(Math.max(Number(z), min), max);
-  try {
-    await track.applyConstraints({ advanced: [{ zoom: z }] });
-    curZoom = z;
-    $('zslider').value = z;
-    $('zlabel').textContent = z.toFixed(1) + '×';
-    document.querySelectorAll('.zb').forEach(b => b.classList.toggle('on', Math.abs(Number(b.dataset.z) - z) < 0.15));
-  } catch (e) { console.warn('Zoom failed', e); }
+  if (!track) return;
+  const r = zoomRange();
+  z = Math.min(Math.max(Number(z), r.min), r.max);
+  if (!digitalZoom) {
+    try { await track.applyConstraints({ advanced: [{ zoom: z }] }); }
+    catch (e) {
+      try { await track.applyConstraints({ zoom: z }); }
+      catch (e2) { console.warn('Hardware zoom failed, using digital', e2); digitalZoom = true; }
+    }
+  }
+  vid.style.transform = digitalZoom ? 'scale(' + z + ')' : '';
+  curZoom = z;
+  $('zslider').value = z;
+  $('zlabel').textContent = z.toFixed(1) + '×' + (digitalZoom ? ' D' : '');
+  document.querySelectorAll('.zb').forEach(b => b.classList.toggle('on', Math.abs(Number(b.dataset.z) - z) < 0.15));
 }
 
 async function toggleTorch() {
@@ -536,14 +570,6 @@ async function toggleTorch() {
     await track.applyConstraints({ advanced: [{ torch: torchOn }] });
     $('sc-flash').classList.toggle('on', torchOn);
   } catch (e) { torchOn = false; showToast('Flash not available', true); }
-}
-
-async function switchLens() {
-  await listRearCams();
-  if (!rearCams.length) return;
-  const i = rearCams.findIndex(d => d.id === camId);
-  const next = rearCams[(i + 1) % rearCams.length];
-  if (next && next.id !== camId) await startStream(next.id);
 }
 
 /* ----- Detection ----- */
@@ -607,7 +633,6 @@ function closeScanner() {
 
 $('sc-back').addEventListener('click', closeScanner);
 $('sc-flash').addEventListener('click', toggleTorch);
-$('sc-lens').addEventListener('click', switchLens);
 $('zslider').addEventListener('input', e => setZoom(e.target.value));
 document.querySelectorAll('.zb').forEach(b => b.addEventListener('click', () => setZoom(b.dataset.z)));
 $('open-cam').addEventListener('click', () => openScanner('app'));
