@@ -269,7 +269,12 @@ async function loadData() {
     store.categories = (catData || []).map(c => ({
       id: c.id, name: c.name,
       items: (itemData || []).filter(i => i.category_id === c.id)
-        .map(i => ({ serial: i.serial, name: i.name, priceUSD: Number(i.price_usd), priceLL: Number(i.price_ll) }))
+        .map(i => {
+          const priceLL = Number(i.price_ll) || 0;
+          // Option B: Keep L.L. fixed, compute USD dynamically based on current transfer rate
+          const priceUSD = transferRate > 0 ? priceLL / transferRate : Number(i.price_usd);
+          return { serial: i.serial, name: i.name, priceUSD, priceLL };
+        })
     }));
     localStorage.setItem('pos_store_data', JSON.stringify(store));
   } catch (e) {
@@ -520,16 +525,28 @@ async function addCategory() {
 
 async function editRate() {
   openModal('Exchange Rate', field('f-rate', 'Transfer Rate (L.L. per $1)', 'number', transferRate, 'step="1" min="1"'), async () => {
-    const val = parseFloat($('f-rate').value);
-    if (isNaN(val) || val <= 0) return 'Enter a valid rate.';
-    showToast('Saving rate...', false, true);
-    const { error } = await supabaseClient.from('settings').upsert({ key: 'transfer_rate', value: String(val) });
+    const newRate = parseFloat($('f-rate').value);
+    if (isNaN(newRate) || newRate <= 0) return 'Enter a valid rate.';
+    showToast('Updating rate & prices...', false, true);
+    
+    // 1. Save new rate to settings table
+    const { error } = await supabaseClient.from('settings').upsert({ key: 'transfer_rate', value: String(newRate) });
     if (error) { showToast(error.message, true); return error.message; }
-    transferRate = val;
+
+    transferRate = newRate;
     $('rate-display').textContent = transferRate.toLocaleString();
+
+    // 2. Recalculate and update USD prices for all items in the database based on Option B (L.L.-Fixed)
+    for (const c of store.categories) {
+      for (const it of (c.items || [])) {
+        it.priceUSD = transferRate > 0 ? it.priceLL / transferRate : it.priceUSD;
+        await supabaseClient.from('items').update({ price_usd: it.priceUSD }).eq('serial', it.serial);
+      }
+    }
+
     render();
     closeModal();
-    showToast('Transfer rate updated!');
+    showToast('Transfer rate updated & prices recalculated!');
   });
 }
 
@@ -553,7 +570,6 @@ async function addItem() {
     render(); closeModal(); showToast('Product added!');
   });
 
-  // Attach live calculation listener
   setTimeout(() => {
     $('f-cam').addEventListener('click', () =>$('f-photo-add').click());
     const llIn = $('f-ll'), usdIn =$('f-usd');
