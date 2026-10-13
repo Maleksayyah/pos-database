@@ -141,6 +141,15 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
   .menu-btn{display:block}
   .backdrop.open{display:block}
 }
+#scanpage{background:var(--bg);touch-action:auto}
+#scanpage.open{display:flex;flex-direction:column;align-items:center}
+.sp-body{flex:1;width:100%;max-width:420px;display:flex;flex-direction:column;justify-content:center;align-items:stretch;gap:16px;padding:70px 20px 10px}
+#res{padding:22px 18px}
+#res .rname{font-size:1.3rem}
+#res .rll{font-size:2.6rem}
+#sp-hint{color:var(--muted);text-align:center}
+#sc-shoot{width:96px;height:96px;border-radius:50%;background:var(--accent);color:#051d14;font-size:2.4rem;margin:10px 0 calc(env(safe-area-inset-bottom,0px) + 28px);box-shadow:0 8px 24px rgba(16,185,129,.4);padding:0;display:grid;place-items:center}
+#sc-shoot:active{transform:scale(.94)}
 </style>
 </head>
 <body>
@@ -203,35 +212,16 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
 
 <div id="scan"><div class="ssn" id="s-sn"></div><div class="sname" id="s-name"></div><div class="sll num" id="s-ll"></div><div class="susd num" id="s-usd"></div></div>
 
-<!-- Full-screen scanner page -->
+<!-- Scan page: phone camera takes the shot -->
 <div id="scanpage">
-  <video id="vid" playsinline muted autoplay></video>
-  <div class="frame"></div>
-  <div id="sc-hint"></div>
-  <div id="sc-status" style="position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);z-index:4;color:#fff;text-align:center;font-weight:600;text-shadow:0 1px 6px #000;display:none"></div>
-  <div class="sc-top">
-    <button class="circ" id="sc-back" aria-label="Back">←</button>
-    <span class="sc-title" id="sc-title">Scan Item</span>
-    <div style="display:flex;gap:6px">
-      <button class="circ" id="sc-batch" aria-label="Batch mode" title="Batch mode: scan many items, running total">🧾</button>
-      <button class="circ" id="sc-gallery" aria-label="Scan from gallery" title="Scan from gallery">🖼</button>
-      <button class="circ" id="sc-photo" aria-label="Photo scan" title="Take a photo with the phone camera app (best focus)">📸</button>
-      <button class="circ" id="sc-flash" aria-label="Flash" title="Flash">⚡</button>
-    </div>
+  <button class="circ" id="sc-back" aria-label="Back" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:14px">←</button>
+  <div class="sp-body">
+    <div id="res"><div class="rsn" id="r-sn"></div><div class="rname" id="r-name"></div><div class="rll num" id="r-ll"></div><div class="rusd num" id="r-usd"></div></div>
+    <div id="sp-hint">Tap the camera and take a photo of the barcode</div>
   </div>
-  <div class="sc-bottom">
-    <div id="res"><div class="rsn" id="r-sn"></div><div class="rname" id="r-name"></div><div class="rll num" id="r-ll"></div><div class="rusd num" id="r-usd"></div><div id="r-batch" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-weight:700;color:var(--accent)"></div><button class="btn light" id="r-clear" style="display:none;margin-top:8px;padding:6px 12px;font-size:.8rem">Clear batch</button></div>
-    <div class="zoom-row" id="zoom-row">
-      <button class="zb" data-z="1">1x</button>
-      <button class="zb" data-z="2">2x</button>
-      <button class="zb" data-z="3">3x</button>
-      <input type="range" id="zslider" min="1" max="5" step="0.1" value="1">
-      <span id="zlabel">1.0×</span>
-    </div>
-  </div>
-  <div id="hq"></div>
+  <button id="sc-shoot" aria-label="Take photo">📸</button>
   <input type="file" id="f-photo" accept="image/*" capture="environment" class="hidden">
-  <input type="file" id="f-gallery" accept="image/*" class="hidden">
+  <div id="hq"></div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -254,7 +244,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_pYeJwa6OZPeKW8fI34I7bQ_WdUs5Bfb";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let store = { categories: [] }, admin = false, cat = 0, query = '', sel = new Set();
-let scanT = null, toastT = null;
+let scanT = null, toastT = null, dataReady = Promise.resolve();
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const usd = n => '$' + (Number(n) || 0).toFixed(2);
@@ -263,7 +253,6 @@ const ll = n => 'L.L. ' + (Number(n) || 0).toLocaleString('en-US');
 /* ---------- Data ---------- */
 async function loadData() {
   try {
-    showToast('Loading data...', false, true);
     const { data: catData, error: catErr } = await supabaseClient.from('categories').select('*');
     if (catErr) throw catErr;
     const { data: itemData, error: itemErr } = await supabaseClient.from('items').select('*');
@@ -274,11 +263,10 @@ async function loadData() {
         .map(i => ({ serial: i.serial, name: i.name, priceUSD: Number(i.price_usd), priceLL: Number(i.price_ll) }))
     }));
     localStorage.setItem('pos_store_data', JSON.stringify(store));
-    showToast('Loaded successfully!');
   } catch (e) {
     console.error(e);
     const local = localStorage.getItem('pos_store_data');
-    if (local) { store = JSON.parse(local); showToast('Loaded from local storage (Offline)', true); }
+    if (local) { store = JSON.parse(local); /* offline: silent */ }
     else showToast('Failed to load data', true);
   }
   render();
@@ -291,13 +279,13 @@ function selectRole(r) {
   $('login').classList.add('hidden');
   $('app').classList.remove('hidden'); $('role-sub').textContent = r;
   $('admin-tools').classList.toggle('hidden', !admin);
-  loadData();
+  dataReady = loadData();
   setTimeout(() => $('q').focus(), 50);
 }
 async function startScanMode() {
   admin = false;
-  openScanner('login');          // camera opens immediately
-  loadData();                    // prices load in the background
+  dataReady = loadData();        // prices load silently in the background
+  openScanner('login');          // phone camera opens immediately
 }
 function logout() {
   localStorage.removeItem('pos_user_role');
@@ -411,424 +399,84 @@ function showScan(serial) {          // small popup used by the search box (Ente
 }
 
 /* =====================================================================
-   FULL-SCREEN CAMERA SCANNER (portrait, main lens, zoom, autofocus)
+   PHOTO SCANNER: the phone's own Camera app takes the shot (best focus)
    ===================================================================== */
-let stream = null, track = null, scanning = false, detector = null, fallbackQr = null, busy = false;
-let rearCams = [], camId = null, torchOn = false, lastCode = '', lastTime = 0, scanFrom = 'app';
-let zoomCaps = null, curZoom = 1;
-const vid = $('vid');
 const FORMATS = ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','code_93','itf','codabar','qr_code'];
+let scanFrom = 'app';
 
-const isFront = l => /front|user|selfie|facetime/i.test(l || '');
-const isRear = l => /back|rear|environment/i.test(l || '') && !isFront(l);
-const isSecondaryLens = l => /ultra|wide|tele|macro|depth/i.test(l || '');
-
-async function listRearCams() {
-  const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
-  rearCams = devs.filter(d => isRear(d.label))
-    .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
-}
-// Main camera = first rear camera that is not labelled ultra-wide / tele / macro
-function pickMainCam() {
-  return rearCams.find(d => !isSecondaryLens(d.label)) || rearCams[0] || null;
-}
-
-async function openScanner(from) {
-  primeAudio();
+function openScanner(from) {                 // must stay synchronous (needs the tap gesture)
   scanFrom = from || 'app';
+  $('res').classList.remove('show'); $('sp-hint').style.display = '';
   $('scanpage').classList.add('open');
-  $('res').classList.remove('show');
-  lastCode = ''; lastTime = 0;
-  try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('portrait'); } catch (_) {}
-  await startStream(null);
+  $('f-photo').click();                      // opens the phone camera right away
 }
-
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-function setStatus(t) { const e = $('sc-status'); e.textContent = t || ''; e.style.display = t ? 'block' : 'none'; }
-async function attachStream() {
-  vid.muted = true; vid.setAttribute('playsinline', ''); vid.setAttribute('muted', '');
-  vid.srcObject = stream;
-  try { await vid.play(); } catch (e) { console.warn('play() failed', e); }
+function closeScanner() {
+  $('scanpage').classList.remove('open');
+  if (scanFrom === 'app') setTimeout(() => $('q').focus(), 50);
 }
-async function openFirst(deviceId) {
-  const hd = { width: { ideal: 1920 }, height: { ideal: 1080 } };
-  const attempts = deviceId
-    ? [{ deviceId: { exact: deviceId }, ...hd }, { deviceId: { exact: deviceId } }]
-    : [{ facingMode: { ideal: 'environment' }, ...hd }, { facingMode: 'environment' }, true];
-  let lastErr;
-  for (const v of attempts) {
-    try { return await navigator.mediaDevices.getUserMedia({ video: v, audio: false }); }
-    catch (e) { lastErr = e; if (e.name === 'NotAllowedError' || e.name === 'SecurityError') throw e; await sleep(200); }
-  }
-  throw lastErr;
-}
-async function probeBestCam() {
-  // Open each rear camera briefly and score it: the main lens has autofocus + hardware zoom,
-  // the ultra-wide (0.5x) usually has neither.
-  if (rearCams.length < 2) return rearCams[0] ? rearCams[0].id : null;
-  let best = null, bestScore = -1e9;
-  for (let i = 0; i < Math.min(rearCams.length, 5); i++) {
-    const d = rearCams[i];
-    try {
-      const st = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: d.id } }, audio: false });
-      const t = st.getVideoTracks()[0];
-      const c = t.getCapabilities ? t.getCapabilities() : {};
-      let sc = 0;
-      if (c.zoom) sc += 4;
-      if (c.zoom && Number(c.zoom.max) >= 4) sc += 1;
-      if (c.focusMode && c.focusMode.includes('continuous')) sc += 2;
-      if (isSecondaryLens(d.label)) sc -= 5;
-      sc -= i * 0.1;
-      if (sc > bestScore) { bestScore = sc; best = d.id; }
-      st.getTracks().forEach(x => x.stop());
-      await sleep(250);
-    } catch (e) { console.warn('probe failed', d.label, e); await sleep(250); }
-  }
-  return best;
-}
-
-async function startStream(deviceId) {
-  stopStream(false);
-  setStatus('Starting camera…');
-  try {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw Object.assign(new Error('no mediaDevices'), { name: 'InsecureContext' });
-    stream = await openFirst(deviceId);
-    track = stream.getVideoTracks()[0];
-    await attachStream();                 // preview shows immediately
-
-    if (!deviceId) {                      // find & switch to the MAIN rear lens (1x)
-      await listRearCams();
-      const cur = track.getSettings().deviceId;
-      let mainId = localStorage.getItem('pos_main_cam');
-      if (!rearCams.some(d => d.id === mainId)) mainId = null;
-      if (!mainId) {
-        stream.getTracks().forEach(t => t.stop());
-        await sleep(300);
-        mainId = await probeBestCam();
-        if (mainId) localStorage.setItem('pos_main_cam', mainId);
-      } else if (mainId !== cur) {
-        stream.getTracks().forEach(t => t.stop());
-        await sleep(300);
-      }
-      if (!stream.active || mainId !== cur) {
-        try { stream = await openFirst(mainId || null); }
-        catch (e) { console.warn('Main lens failed', e); localStorage.removeItem('pos_main_cam'); await sleep(300); stream = await openFirst(null); }
-        track = stream.getVideoTracks()[0];
-        await attachStream();
-      }
-    }
-    camId = track.getSettings().deviceId || deviceId;
-    $('sc-title').textContent = 'Scan Item' + (track.label ? ' · ' + track.label.replace(/,?\s*facing back/i, '') : '');
-    setStatus('');
-    await setupCameraControls();
-    startDetection();
-  } catch (err) {
-    console.error('Camera error:', err);
-    let msg = 'Camera error: ' + (err && (err.name || err.message));
-    if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) msg = 'Camera permission blocked. Chrome ⋮ → Site settings → Camera → Allow, then reload.';
-    else if (err && err.name === 'InsecureContext') msg = 'Camera needs HTTPS. Open this page from an https:// link in Chrome.';
-    else if (err && err.name === 'NotFoundError') msg = 'No camera found.';
-    else if (err && (err.name === 'NotReadableError' || err.name === 'TrackStartError' || err.name === 'AbortError')) msg = 'Camera is busy. Close the Camera app / other tabs, then press back and try again.';
-    setStatus(msg); showToast(msg, true);
-  }
-}
-
-const DEFAULT_ZOOM = 2;
-let digitalZoom = false;
-function zoomRange() {
-  if (zoomCaps && !digitalZoom) return { min: Math.max(1, Number(zoomCaps.min) || 1), max: Math.min(Number(zoomCaps.max) || 1, 10), step: Number(zoomCaps.step) || 0.1 };
-  return { min: 1, max: 5, step: 0.1 };
-}
-async function setupCameraControls() {
-  torchOn = false; $('sc-flash').classList.remove('on');
-  const caps = track.getCapabilities ? track.getCapabilities() : {};
-  try {
-    if (caps.focusMode && caps.focusMode.includes('continuous'))
-      await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-  } catch (_) {}
-  zoomCaps = caps.zoom || null;
-  digitalZoom = !zoomCaps;                       // no hardware zoom -> digital zoom fallback
-  vid.style.transform = ''; curZoom = 1;
-  $('sc-flash').style.display = caps.torch ? '' : 'none';
-  $('zoom-row').style.display = 'flex';
-  const r = zoomRange(), sl = $('zslider');
-  sl.min = r.min; sl.max = r.max; sl.step = r.step;
-  await setZoom(digitalZoom ? 1 : Math.min(DEFAULT_ZOOM, zoomRange().max));
-}
-async function setZoom(z) {
-  if (!track) return;
-  const r = zoomRange();
-  z = Math.min(Math.max(Number(z), r.min), r.max);
-  if (!digitalZoom) {
-    try { await track.applyConstraints({ advanced: [{ zoom: z }] }); }
-    catch (e) {
-      try { await track.applyConstraints({ zoom: z }); }
-      catch (e2) { console.warn('Hardware zoom failed, using digital', e2); digitalZoom = true; }
-    }
-  }
-  vid.style.transform = digitalZoom ? 'scale(' + z + ')' : '';
-  curZoom = z;
-  $('zslider').value = z;
-  $('zlabel').textContent = z.toFixed(1) + '×' + (digitalZoom ? ' D' : '');
-  document.querySelectorAll('.zb').forEach(b => b.classList.toggle('on', Math.abs(Number(b.dataset.z) - z) < 0.15));
-}
-
-async function toggleTorch() {
-  if (!track) return;
-  try {
-    torchOn = !torchOn;
-    await track.applyConstraints({ advanced: [{ torch: torchOn }] });
-    $('sc-flash').classList.toggle('on', torchOn);
-  } catch (e) { torchOn = false; showToast('Flash not available', true); }
-}
-
-/* ----- Detection ----- */
-function startDetection() {
-  scanning = true; lastAct = Date.now(); lastNudge = 0; setHint('');
-  if (!detector && !fallbackQr && 'BarcodeDetector' in window) {
-    try { detector = new BarcodeDetector({ formats: FORMATS }); }
-    catch (_) { try { detector = new BarcodeDetector(); } catch (__) { detector = null; } }
-  }
-  if (!detector && !fallbackQr && window.Html5Qrcode) {
-    fallbackQr = new Html5Qrcode('hq', { verbose: false });
-  }
-  loop();
-}
-async function loop() {
-  if (!scanning) return;
-  autoNudge();
-  if (vid.readyState >= 2 && !busy) {
-    busy = true;
-    try {
-      if (detector) {
-        const codes = await detector.detect(vid);
-        if (codes.length) onCode(codes[0].rawValue);
-      } else if (fallbackQr) {
-        const c = document.createElement('canvas');
-        c.width = vid.videoWidth; c.height = vid.videoHeight;
-        c.getContext('2d').drawImage(vid, 0, 0);
-        const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', .85));
-        const text = await fallbackQr.scanFile(new File([blob], 'f.jpg', { type: 'image/jpeg' }), false);
-        if (text) onCode(text);
-      }
-    } catch (_) {}
-    busy = false;
-  }
-  setTimeout(loop, detector ? 80 : 350);
-}
-let seenAt = 0, nudgeN = 0, batch = false, batchList = new Map();
-let actx = null, lastAct = Date.now(), lastNudge = 0;
-function primeAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (_) {} }
 function beep() {
   try {
-    primeAudio();
-    const o = actx.createOscillator(), g = actx.createGain();
+    const A = window.AudioContext || window.webkitAudioContext, c = new A();
+    const o = c.createOscillator(), g = c.createGain();
     o.type = 'square'; o.frequency.value = 1800; g.gain.value = .08;
-    o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + .12);
+    o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime + .12);
+    setTimeout(() => c.close(), 300);
   } catch (_) {}
 }
-function setHint(t) { const e = $('sc-hint'); e.textContent = t || ''; e.style.display = t ? 'block' : 'none'; }
-async function afKick() {                     // restart the camera's own autofocus
-  if (!track || focusBusy) return;
-  const modes = (track.getCapabilities ? track.getCapabilities() : {}).focusMode || [];
-  try {
-    if (modes.includes('continuous')) {
-      if (modes.includes('manual')) { await track.applyConstraints({ advanced: [{ focusMode: 'manual' }] }); await sleep(150); }
-      await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-    }
-  } catch (_) {}
-}
-function autoNudge() {                        // nothing scanned for a while: help the user + re-trigger AF
-  const now = Date.now();
-  if (now - lastAct > 3500 && now - lastNudge > 3500) {
-    lastNudge = now; afKick();
-    if (!digitalZoom && zoomCaps) setZoom([3, 1.5, 2][nudgeN++ % 3]);
-    setHint('Hold 15–20 cm away · keep barcode flat · tap to focus');
-  }
-}
-function onCode(code) {
-  const now = Date.now();
-  lastAct = now; setHint('');
-  const gap = now - seenAt; seenAt = now;
-  if (code === lastCode && gap < 1200) return;             // same barcode still in view
-  lastCode = code; lastTime = now;
+async function showResult(code) {
+  await dataReady;
+  const found = findItem(code);
   if (navigator.vibrate) navigator.vibrate(60);
   beep();
-  const fr = document.querySelector('.frame'); fr.classList.add('ok'); setTimeout(() => fr.classList.remove('ok'), 350);
-  const found = findItem(code);
-  if (batch && found) { const b = batchList.get(found.serial) || { it: found, qty: 0 }; b.qty++; batchList.set(found.serial, b); updateBatchUI(); }
   const res = $('res');
   res.classList.add('show'); res.classList.toggle('nf', !found);
+  $('sp-hint').style.display = 'none';
   $('r-sn').textContent = 'SN: ' + code;
   $('r-name').textContent = found ? found.name : 'Item not found';
   $('r-ll').textContent = found ? ll(found.priceLL) : '';
   $('r-usd').textContent = found ? usd(found.priceUSD) : '';
 }
 
-function stopStream(hide = true) {
-  scanning = false;
-  if (stream) stream.getTracks().forEach(t => t.stop());
-  stream = null; track = null; vid.srcObject = null;
-  if (hide) $('scanpage').classList.remove('open');
+async function detectIn(source, det) {
+  const codes = await det.detect(source);
+  return codes.length ? codes[0].rawValue : null;
 }
-function closeScanner() {
-  stopStream(true);
-  try { screen.orientation && screen.orientation.unlock && screen.orientation.unlock(); } catch (_) {}
-  if (scanFrom === 'app') setTimeout(() => $('q').focus(), 50);
-}
-
-$('sc-back').addEventListener('click', closeScanner);
-$('sc-flash').addEventListener('click', toggleTorch);
-/* ----- Batch mode + photo / gallery scan ----- */
-function updateBatchUI() {
-  let n = 0, l = 0, u = 0;
-  batchList.forEach(b => { n += b.qty; l += (b.it.priceLL || 0) * b.qty; u += (b.it.priceUSD || 0) * b.qty; });
-  $('r-batch').style.display = batch ? 'block' : 'none';
-  $('r-clear').style.display = batch ? '' : 'none';
-  $('r-batch').textContent = n + (n === 1 ? ' item · ' : ' items · ') + ll(l) + ' · ' + usd(u);
-  $('sc-batch').classList.toggle('on', batch);
-}
-$('sc-batch').addEventListener('click', () => {
-  batch = !batch;
-  if (batch) {
-    const res = $('res'); res.classList.add('show'); res.classList.remove('nf');
-    $('r-sn').textContent = ''; $('r-name').textContent = 'Batch mode: scan items'; $('r-ll').textContent = ''; $('r-usd').textContent = '';
-  } else batchList.clear();
-  updateBatchUI();
-});
-$('r-clear').addEventListener('click', () => { batchList.clear(); updateBatchUI(); });
-
 async function decodeFile(file) {
   if (!file) return;
-  showToast('Reading image…', false, true);
+  showToast('Reading photo…', false, true);
   let text = null;
   try {
     if ('BarcodeDetector' in window) {
       let det; try { det = new BarcodeDetector({ formats: FORMATS }); } catch (_) { det = new BarcodeDetector(); }
       const bmp = await createImageBitmap(file);
-      const codes = await det.detect(bmp);
-      if (codes.length) text = codes[0].rawValue;
+      // 1) downscaled copy (fast, tolerant), 2) original size
+      const max = 1800, k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+      if (k < 1) {
+        const c = document.createElement('canvas');
+        c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+        c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+        text = await detectIn(c, det);
+      }
+      if (!text) text = await detectIn(bmp, det);
     }
     if (!text && window.Html5Qrcode) {
       const hq = new Html5Qrcode('hq', { verbose: false });
       try { text = await hq.scanFile(file, false); } catch (_) {}
     }
   } catch (e) { console.warn('decodeFile', e); }
-  if (text) { lastCode = ''; seenAt = 0; onCode(text); showToast('Scanned'); }
-  else showToast('No barcode found. Retake the photo closer, flat and well lit.', true);
+  $('toast').classList.remove('show');
+  if (text) showResult(text);
+  else {
+    $('res').classList.remove('show'); $('sp-hint').style.display = '';
+    $('sp-hint').textContent = 'No barcode found. Retake the photo closer, flat and well lit.';
+    showToast('No barcode found. Try again.', true);
+  }
 }
-['f-photo', 'f-gallery'].forEach(id => $(id).addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; decodeFile(f); }));
-$('sc-photo').addEventListener('click', () => $('f-photo').click());
-$('sc-gallery').addEventListener('click', () => $('f-gallery').click());
 
-$('zslider').addEventListener('input', e => setZoom(e.target.value));
-document.querySelectorAll('.zb').forEach(b => b.addEventListener('click', () => setZoom(b.dataset.z)));
+$('f-photo').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; decodeFile(f); });
+$('sc-shoot').addEventListener('click', () => $('f-photo').click());
+$('sc-back').addEventListener('click', closeScanner);
 $('open-cam').addEventListener('click', () => openScanner('app'));
-
-// Pinch to zoom
-let pinchD = 0, pinchZ = 1;
-const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-$('scanpage').addEventListener('touchstart', e => { if (e.touches.length === 2) { pinchD = dist(e.touches); pinchZ = curZoom; } }, { passive: true });
-$('scanpage').addEventListener('touchmove', e => { if (e.touches.length === 2 && pinchD) setZoom(pinchZ * dist(e.touches) / pinchD); }, { passive: true });
-$('scanpage').addEventListener('touchend', () => { pinchD = 0; });
-
-// Tap to focus (tries every focus method the camera exposes)
-let focusBusy = false;
-function focusRing(x, y, ok) {
-  const r = document.createElement('div');
-  r.style.cssText = 'position:absolute;z-index:6;width:76px;height:76px;margin:-38px 0 0 -38px;border:2px solid ' + (ok ? '#10b981' : '#f59e0b') + ';border-radius:50%;pointer-events:none;transition:all .35s;left:' + x + 'px;top:' + y + 'px;transform:scale(1.5);opacity:1';
-  $('scanpage').appendChild(r);
-  requestAnimationFrame(() => { r.style.transform = 'scale(1)'; });
-  setTimeout(() => { r.style.opacity = '0'; }, 700);
-  setTimeout(() => r.remove(), 1100);
-}
-// Software autofocus: sweep manual focus distance and keep the sharpest picture
-function sharpness() {
-  const c = sharpness.c || (sharpness.c = document.createElement('canvas'));
-  c.width = c.height = 160;
-  const ctx = c.getContext('2d', { willReadFrequently: true });
-  const w = vid.videoWidth, h = vid.videoHeight, sw = w * 0.4, sh = h * 0.4;
-  ctx.drawImage(vid, (w - sw) / 2, (h - sh) / 2, sw, sh, 0, 0, 160, 160);
-  const d = ctx.getImageData(0, 0, 160, 160).data;
-  let sum = 0;
-  for (let y = 0; y < 159; y++) for (let x = 0; x < 159; x++) {
-    const i = (y * 160 + x) * 4, g = d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11;
-    const gx = d[i + 4] * .3 + d[i + 5] * .59 + d[i + 6] * .11, gy = d[i + 640] * .3 + d[i + 641] * .59 + d[i + 642] * .11;
-    sum += (g - gx) * (g - gx) + (g - gy) * (g - gy);
-  }
-  return sum;
-}
-async function sweepFocus(caps) {
-  const fd = caps.focusDistance, min = Number(fd.min), max = Number(fd.max);
-  const set = v => track.applyConstraints({ advanced: [{ focusMode: 'manual', focusDistance: v }] });
-  const measure = async v => { await set(v); await sleep(260); return sharpness(); };
-  let best = min, bestS = -1;
-  const N = 10;
-  for (let i = 0; i <= N; i++) {
-    const v = min + (max - min) * Math.pow(i / N, 2);        // denser near the camera
-    const sc = await measure(v);
-    if (sc > bestS) { bestS = sc; best = v; }
-  }
-  // refine around the best value
-  const span = (max - min) / 8;
-  for (let i = -2; i <= 2; i++) {
-    const v = Math.min(max, Math.max(min, best + i * span / 4));
-    const sc = await measure(v);
-    if (sc > bestS) { bestS = sc; best = v; }
-  }
-  await set(best);
-  return best;
-}
-async function refocus(e) {
-  if (!track || focusBusy) return;
-  const rect = $('scanpage').getBoundingClientRect();
-  const px = e.clientX - rect.left, py = e.clientY - rect.top;
-  const caps = track.getCapabilities ? track.getCapabilities() : {};
-  const modes = caps.focusMode || [];
-  const nx = Math.min(1, Math.max(0, e.clientX / innerWidth)), ny = Math.min(1, Math.max(0, e.clientY / innerHeight));
-  focusBusy = true;
-  let ok = false;
-  try {
-    if (caps.focusDistance && modes.includes('manual') && !modes.includes('continuous') && vid.videoWidth) {
-      showToast('Focusing… hold steady', false, true);
-      const v = await sweepFocus(caps);
-      showToast('Focused');
-      focusRing(px, py, true);
-      focusBusy = false;
-      return;
-    }
-    // 1) point of interest + single-shot (best, if supported)
-    if (modes.includes('single-shot')) {
-      try { await track.applyConstraints({ advanced: [{ focusMode: 'single-shot', pointsOfInterest: [{ x: nx, y: ny }] }] }); ok = true; }
-      catch (_) { await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] }); ok = true; }
-    }
-    // 2) otherwise kick the autofocus: manual -> continuous restarts the AF scan
-    else if (modes.includes('continuous')) {
-      if (modes.includes('manual')) {
-        await track.applyConstraints({ advanced: [{ focusMode: 'manual' }] });
-        await sleep(180);
-      }
-      await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-      ok = true;
-    }
-    // 3) nothing exposed
-    if (!modes.length) showToast('This phone does not let Chrome control focus. Keep the phone ~10–15 cm from the barcode.', true);
-    else if (modes.includes('single-shot')) setTimeout(() => { track && modes.includes('continuous') && track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {}); }, 1800);
-  } catch (err) { console.warn('focus failed', err); ok = false; }
-  focusRing(px, py, ok);
-  setTimeout(() => { focusBusy = false; }, 400);
-}
-$('scanpage').addEventListener('click', e => {
-  if (e.target.closest('button,input,#res,.zoom-row')) return;
-  refocus(e);
-});
-
-// Release camera when the tab is hidden, reopen when back
-document.addEventListener('visibilitychange', () => {
-  const open = $('scanpage').classList.contains('open');
-  if (document.hidden && stream) stopStream(false);
-  else if (!document.hidden && open && !stream) startStream(camId);
-});
 
 /* ---------- Admin DB actions ---------- */
 const field = (id, label, type = 'text', val = '', extra = '') =>
