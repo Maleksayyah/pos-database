@@ -205,6 +205,7 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
 <div id="scanpage">
   <video id="vid" playsinline muted autoplay></video>
   <div class="frame"></div>
+  <div id="sc-status" style="position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);z-index:4;color:#fff;text-align:center;font-weight:600;text-shadow:0 1px 6px #000;display:none"></div>
   <div class="sc-top">
     <button class="circ" id="sc-back" aria-label="Back">←</button>
     <span class="sc-title">Scan Item</span>
@@ -434,39 +435,62 @@ async function openScanner(from) {
   await startStream(null);
 }
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function setStatus(t) { const e = $('sc-status'); e.textContent = t || ''; e.style.display = t ? 'block' : 'none'; }
+async function attachStream() {
+  vid.muted = true; vid.setAttribute('playsinline', ''); vid.setAttribute('muted', '');
+  vid.srcObject = stream;
+  try { await vid.play(); } catch (e) { console.warn('play() failed', e); }
+}
+async function openFirst(deviceId) {
+  const hd = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+  const attempts = deviceId
+    ? [{ deviceId: { exact: deviceId }, ...hd }, { deviceId: { exact: deviceId } }]
+    : [{ facingMode: { ideal: 'environment' }, ...hd }, { facingMode: 'environment' }, true];
+  let lastErr;
+  for (const v of attempts) {
+    try { return await navigator.mediaDevices.getUserMedia({ video: v, audio: false }); }
+    catch (e) { lastErr = e; if (e.name === 'NotAllowedError' || e.name === 'SecurityError') throw e; await sleep(200); }
+  }
+  throw lastErr;
+}
 async function startStream(deviceId) {
   stopStream(false);
+  setStatus('Starting camera…');
   try {
-    const base = { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } };
-    const video = deviceId
-      ? { ...base, deviceId: { exact: deviceId } }
-      : { ...base, facingMode: { ideal: 'environment' } };
-    stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw Object.assign(new Error('no mediaDevices'), { name: 'InsecureContext' });
+    stream = await openFirst(deviceId);
     track = stream.getVideoTracks()[0];
+    await attachStream();                 // preview shows immediately
 
-    // Labels are only available after permission: now re-open on the MAIN rear lens
-    // (facingMode alone often picks the 0.5x ultra-wide camera on Android).
+    // Upgrade to the MAIN rear lens (facingMode alone may pick the 0.5x ultra-wide)
     if (!deviceId) {
       await listRearCams();
       const main = pickMainCam();
       const cur = track.getSettings().deviceId;
-      if (main && main.id !== cur) return startStream(main.id);
+      if (main && main.id !== cur) {
+        stream.getTracks().forEach(t => t.stop());
+        await sleep(350);
+        try { stream = await openFirst(main.id); }
+        catch (e) { console.warn('Main lens failed, using default', e); await sleep(300); stream = await openFirst(null); }
+        track = stream.getVideoTracks()[0];
+        await attachStream();
+      }
     }
     camId = track.getSettings().deviceId || deviceId;
     await listRearCams();
     $('sc-lens').style.display = rearCams.filter(d => d.id !== camId).length ? '' : 'none';
-
-    vid.srcObject = stream;
-    await vid.play().catch(() => {});
+    setStatus('');
     await setupCameraControls();
     startDetection();
   } catch (err) {
     console.error('Camera error:', err);
-    let msg = 'Could not open camera. Use HTTPS and allow camera permission.';
-    if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) msg = 'Camera permission denied. Allow Camera for this site in Chrome.';
+    let msg = 'Camera error: ' + (err && (err.name || err.message));
+    if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) msg = 'Camera permission blocked. Chrome ⋮ → Site settings → Camera → Allow, then reload.';
+    else if (err && err.name === 'InsecureContext') msg = 'Camera needs HTTPS. Open this page from an https:// link in Chrome.';
     else if (err && err.name === 'NotFoundError') msg = 'No camera found.';
-    else if (err && (err.name === 'NotReadableError' || err.name === 'TrackStartError')) msg = 'Camera is busy. Close other apps using it.';
-    showToast(msg, true);
+    else if (err && (err.name === 'NotReadableError' || err.name === 'TrackStartError' || err.name === 'AbortError')) msg = 'Camera is busy. Close the Camera app / other tabs, then press back and try again.';
+    setStatus(msg); showToast(msg, true);
   }
 }
 
