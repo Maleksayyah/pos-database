@@ -2,62 +2,81 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>POS System</title>
+<!-- Barcode Scanner Library -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<!-- Supabase JS Client Library -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-:root{--bg:#090d16;--panel:#111827;--card:#1f2937;--side:#0d131f;--side2:#1e293b;--line:#2d3748;--ink:#f3f4f6;--muted:#9ca3af;--accent:#10b981;--soft:rgba(16,185,129,.15);--danger:#ef4444;--shadow:0 10px 25px -5px rgba(0,0,0,.5)}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;height:100svh}
-body{font:15px/1.5 "Inter",system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg);overflow:hidden}
-button{font:inherit;cursor:pointer;border:0;border-radius:10px;transition:all .15s ease}
+:root {
+  --bg: #090d16;
+  --panel: #111827;
+  --card: #1f2937;
+  --card-hover: #263346;
+  --side: #0d131f;
+  --side2: #1e293b;
+  --line: #2d3748;
+  --ink: #f3f4f6;
+  --muted: #9ca3af;
+  --accent: #10b981;
+  --accent-hover: #059669;
+  --soft: rgba(16, 185, 129, 0.15);
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+  --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+*{box-sizing:border-box;margin:0;padding:0; -webkit-tap-highlight-color: transparent;}
+html,body{height:100%; height: 100svh;}
+body{font:15px/1.5 "Inter", system-ui, -apple-system, sans-serif;color:var(--ink);background:var(--bg);overflow:hidden}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;transition:all 0.15s ease}
 input{font:inherit;user-select:text;color:var(--ink)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .hidden{display:none!important}
-.num{font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-0.02em}
 
 /* Login */
 #login{position:fixed;inset:0;z-index:1000;display:grid;grid-template-columns:1fr 1fr;background:var(--bg);height:100%}
-.brand-pane{background:linear-gradient(135deg,#0f172a,#060911);color:#fff;padding:48px;display:flex;flex-direction:column;justify-content:space-between;border-right:1px solid var(--line)}
-.brand-pane h1{font-size:2.2rem;font-weight:700;line-height:1.15;background:linear-gradient(to right,#fff,#94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.brand-pane p{color:#94a3b8;max-width:36ch}
+.brand-pane{background:linear-gradient(135deg, #0f172a 0%, #060911 100%);color:#fff;padding:48px;display:flex;flex-direction:column;justify-content:space-between;border-right:1px solid var(--line)}
+.brand-pane h1{font-size:2.2rem;font-weight:700;line-height:1.15;background:linear-gradient(to right, #fff, #94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.brand-pane p{color:#94a3b8;max-width:36ch;font-size:1rem}
 .role-pane{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:24px;background:var(--bg)}
-.role-box{width:100%;max-width:400px;display:flex;flex-direction:column;gap:14px}
+.role-box{width:100%;max-width:400px;display:flex;flex-direction:column;gap:16px}
 .role-pane h2{font-size:1.5rem;font-weight:600;margin-bottom:4px;color:#fff}
 .role-btn{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:18px 20px;background:var(--panel);border:1px solid var(--line);text-align:left;border-radius:12px;color:var(--ink);width:100%}
-.role-btn:active{transform:scale(.98)}
+.role-btn:active{transform:scale(0.98)}
 .role-btn b{font-size:1.1rem;color:#fff}
 .role-btn span{color:var(--muted);font-size:.85rem}
-.role-btn.scan{background:var(--soft);border-color:var(--accent)}
-.role-btn.scan b{color:var(--accent)}
 
 /* App shell */
-#app{display:flex;width:100vw;height:100svh;position:relative;overflow:hidden}
-aside{width:260px;min-width:260px;background:var(--side);color:#e2e8f0;display:flex;flex-direction:column;height:100%;border-right:1px solid var(--line);z-index:20;transition:transform .25s ease}
-.logo{padding:18px 16px 12px;font-size:1.1rem;font-weight:700;color:#fff;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;align-items:center}
+#app{display:flex;width:100vw;height:100%;height:100svh;position:relative;overflow:hidden}
+aside{width:260px;min-width:260px;background:var(--side);color:#e2e8f0;display:flex;flex-direction:column;height:100%;border-right:1px solid var(--line);z-index:20;transition:transform 0.25s ease}
+.logo{padding:18px 16px 12px;font-size:1.1rem;font-weight:700;color:#fff;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:center}
 .logo small{display:block;color:var(--accent);font-weight:500;font-size:.7rem;margin-top:2px;text-transform:uppercase}
 .side-label{padding:12px 16px 6px;color:var(--muted);font-size:.75rem;text-transform:uppercase;font-weight:600}
 #cats{flex:1;overflow-y:auto;padding:0 8px;-webkit-overflow-scrolling:touch}
 .cat{display:flex;align-items:center;border-radius:8px;margin-bottom:4px;color:var(--muted)}
 .cat.on{background:var(--soft);color:var(--accent);font-weight:600}
-.cat-btn{flex:1;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 14px;background:none;color:inherit;text-align:left;font-size:.95rem}
-.cat-btn i{font-style:normal;font-size:.75rem;background:rgba(255,255,255,.08);padding:2px 8px;border-radius:12px;color:var(--ink)}
+.cat-btn{flex:1;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 14px;background:none;color:inherit;text-align:left;font-size:0.95rem}
+.cat-btn i{font-style:normal;font-size:.75rem;background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:12px;color:var(--ink)}
 .cat.on .cat-btn i{background:var(--accent);color:#000;font-weight:700}
 .cat-del{background:none;color:#f87171;padding:10px 12px;font-size:1.1rem}
 .side-foot{padding:12px;border-top:1px solid var(--line);display:grid;gap:8px;background:var(--side)}
-.btn{padding:12px 16px;font-weight:600;background:var(--accent);color:#051d14;border-radius:10px;font-size:.95rem}
-.btn:active{transform:scale(.98)}
+.btn{padding:12px 16px;font-weight:600;background:var(--accent);color:#051d14;border-radius:10px;font-size:0.95rem}
+.btn:active{transform:scale(0.98)}
 .btn.ghost{background:var(--side2);color:var(--ink);border:1px solid var(--line)}
 .btn.light{background:var(--card);color:var(--ink);border:1px solid var(--line)}
 .btn.danger{background:var(--danger);color:#fff}
+
 main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;background:var(--bg)}
 .top{display:flex;gap:8px;align-items:center;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
 .search{flex:1;display:flex;gap:8px;align-items:center}
 .search-input-wrap{position:relative;flex:1}
-.search input{width:100%;padding:10px 12px 10px 36px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:#fff;font-size:.95rem}
+.search input{width:100%;padding:10px 12px 10px 36px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:#fff;font-size:0.95rem}
 .search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:18px;height:18px;stroke:var(--muted);fill:none;stroke-width:2}
 .cam-btn{background:var(--accent);color:#051d14;padding:10px 14px;font-size:1.1rem;display:flex;align-items:center;justify-content:center;border-radius:10px}
+
 .content{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
 .head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
 .head h2{font-size:1.25rem;font-weight:700;color:#fff}
@@ -66,30 +85,38 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:4px;cursor:pointer;position:relative}
 .card.on{border-color:var(--accent);background:var(--card);box-shadow:0 0 0 2px var(--accent)}
 .card.on::after{content:"\2713";position:absolute;top:8px;right:8px;width:18px;height:18px;border-radius:50%;background:var(--accent);color:#000;font-size:10px;font-weight:bold;display:grid;place-items:center}
-.name{font-weight:600;font-size:.9rem;color:#fff;padding-right:16px;line-height:1.2}
+.name{font-weight:600;font-size:0.9rem;color:#fff;padding-right:16px;line-height:1.2}
 .sn{color:var(--muted);font-size:.72rem;font-family:monospace;word-break:break-all}
 .ll{font-size:1.2rem;font-weight:800;margin-top:6px;color:var(--accent);line-height:1.25}
 .usd{color:var(--muted);font-weight:500;font-size:.82rem;margin-top:1px}
+.selbar .t{font-weight:700;font-size:1.05rem;color:var(--accent)}
 .selbar .secondary-total{display:block;color:var(--muted);font-size:.78rem;font-weight:500}
 .cat-tag{color:var(--muted);font-size:.7rem;margin-top:4px;background:var(--bg);padding:2px 6px;border-radius:4px;width:fit-content}
 .acts{display:flex;gap:4px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
 .acts button{flex:1;padding:6px 2px;font-weight:600;font-size:.75rem;background:var(--bg);color:var(--ink);border:1px solid var(--line)}
-.acts .del{color:#f87171;border-color:rgba(239,68,68,.2)}
+.acts .del{color:#f87171;border-color:rgba(239, 68, 68, 0.2)}
 .empty{grid-column:1/-1;text-align:center;padding:40px 16px;color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:12px}
+
 .selbar{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--panel);border-top:1px solid var(--line)}
 .selbar .t{font-weight:700;font-size:1.05rem;color:var(--accent)}
 
-/* Modal */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);display:grid;place-items:center;z-index:2000;visibility:hidden;opacity:0;pointer-events:none;transition:all .15s;padding:16px}
+/* Overlay & Scanner */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(4px);display:grid;place-items:center;z-index:2000;visibility:hidden;opacity:0;pointer-events:none;transition:all .15s;padding:16px}
 .overlay.open{visibility:visible;opacity:1;pointer-events:auto}
 .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:100%;max-width:400px;padding:20px;box-shadow:var(--shadow)}
 .modal h3{font-size:1.15rem;margin-bottom:14px;color:#fff;font-weight:600}
 .fg{margin-bottom:12px}.fg label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase}
 .fg input{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:1rem}
 .m-act{display:flex;justify-content:space-between;align-items:center;margin-top:16px}
+.zoom-controls{display:flex;gap:6px}
+.zoom-btn{background:var(--card); color:var(--ink); border:1px solid var(--line); padding:6px 10px; border-radius:8px; font-size:0.8rem; font-weight:600}
 .m-err{color:var(--danger);font-size:.8rem;min-height:1.2em;margin-top:6px}
 
-#scan{position:fixed;top:70px;left:50%;transform:translate(-50%,-10px);background:var(--panel);border:1px solid var(--accent);border-radius:12px;padding:16px 20px;width:90%;max-width:340px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,.6);z-index:1500;opacity:0;visibility:hidden;pointer-events:none;transition:all .2s}
+#scanner-wrapper{width:100%; overflow:hidden; border-radius:12px; background:#000; border:1px solid var(--line); position:relative}
+#interactive{width:100%; min-height:220px}
+.flash-btn{position:absolute; top:10px; right:10px; z-index:10; background:rgba(0,0,0,0.6); color:#fff; border:1px solid var(--line); padding:6px 10px; border-radius:8px; font-size:0.85rem}
+
+#scan{position:fixed;top:70px;left:50%;transform:translate(-50%,-10px);background:var(--panel);border:1px solid var(--accent);border-radius:12px;padding:16px 20px;width:90%;max-width:340px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.6);z-index:1500;opacity:0;visibility:hidden;pointer-events:none;transition:all .2s}
 #scan.open{opacity:1;visibility:visible;transform:translate(-50%,0)}
 #scan .sname{font-size:1.1rem;font-weight:600;color:#fff}
 #scan .sll{font-size:2rem;font-weight:800;margin:2px 0 0;color:var(--accent)}
@@ -99,42 +126,17 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
 #toast{position:fixed;right:16px;bottom:16px;left:16px;background:var(--panel);border:1px solid var(--line);color:#fff;padding:12px 16px;border-radius:10px;display:flex;gap:10px;align-items:center;z-index:3000;opacity:0;visibility:hidden;pointer-events:none;transition:all .2s;text-align:center;justify-content:center}
 #toast.show{opacity:1;visibility:visible}
 #toast.err{border-color:var(--danger);background:#1a0c0c;color:#f87171}
-.spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite}
+.spin{width:14px;height:14px;border:2px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
-.menu-btn{background:var(--panel);border:1px solid var(--line);color:#fff;padding:8px 12px;font-size:1.1rem;border-radius:8px;display:none}
-.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:15;display:none}
 
-/* ===== Full-screen portrait scanner page ===== */
-#scanpage{position:fixed;inset:0;z-index:1800;background:#000;display:none;overflow:hidden;touch-action:none}
-#scanpage.open{display:block}
-#vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
-.frame{position:absolute;left:50%;top:36%;width:80%;max-width:360px;aspect-ratio:1.5;transform:translate(-50%,-50%);border-radius:20px;border:2px solid var(--accent);box-shadow:0 0 0 100vmax rgba(0,0,0,.5);pointer-events:none;overflow:hidden}
-.frame::after{content:"";position:absolute;left:8%;right:8%;height:2px;background:var(--accent);box-shadow:0 0 12px var(--accent);animation:ln 2s ease-in-out infinite}
-@keyframes ln{0%,100%{top:12%}50%{top:88%}}
-.sc-top{position:absolute;top:0;left:0;right:0;display:flex;gap:10px;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 12px) 14px 12px;z-index:5}
-.sc-top .sc-title{color:#fff;font-weight:600;text-shadow:0 1px 4px #000}
-.circ{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:1.2rem;border:1px solid rgba(255,255,255,.25);display:grid;place-items:center;padding:0}
-.circ.on{background:var(--accent);color:#000}
-.sc-bottom{position:absolute;left:0;right:0;bottom:0;padding:12px 14px calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;flex-direction:column;gap:12px;z-index:5;background:linear-gradient(transparent,rgba(0,0,0,.75) 30%)}
-#res{background:var(--panel);border:1px solid var(--accent);border-radius:16px;padding:14px 16px;text-align:center;display:none;box-shadow:0 10px 30px rgba(0,0,0,.6)}
-#res.show{display:block}
-#res.nf{border-color:var(--danger)}
-#res .rsn{color:var(--muted);font-size:.78rem;font-family:monospace;word-break:break-all}
-#res .rname{font-size:1.15rem;font-weight:600;color:#fff}
-#res .rll{font-size:2.1rem;font-weight:800;color:var(--accent);line-height:1.2}
-#res.nf .rname{color:#f87171}
-#res .rusd{color:var(--muted);font-size:1rem}
-.zoom-row{display:flex;align-items:center;gap:10px}
-.zoom-row input[type=range]{flex:1;accent-color:var(--accent);height:28px}
-.zb{background:rgba(0,0,0,.6);color:#fff;border:1px solid rgba(255,255,255,.3);padding:6px 12px;border-radius:18px;font-size:.85rem;font-weight:600;min-width:44px}
-.zb.on{background:var(--accent);color:#000;border-color:var(--accent)}
-#zlabel{color:#fff;font-weight:700;min-width:44px;text-align:center;text-shadow:0 1px 4px #000}
-#hq{display:none}
+/* Responsive Navigation Drawer */
+.menu-btn{background:var(--panel); border:1px solid var(--line); color:#fff; padding:8px 12px; font-size:1.1rem; border-radius:8px; display:none}
+.backdrop{position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:15; display:none}
 
-@media (max-width:768px){
+@media (max-width: 768px) {
   #login{grid-template-columns:1fr}
   .brand-pane{display:none}
-  aside{position:absolute;left:0;top:0;bottom:0;transform:translateX(-100%);box-shadow:10px 0 30px rgba(0,0,0,.8)}
+  aside{position:absolute; left:0; top:0; bottom:0; transform:translateX(-100%); box-shadow:10px 0 30px rgba(0,0,0,0.8)}
   aside.mobile-open{transform:translateX(0)}
   .menu-btn{display:block}
   .backdrop.open{display:block}
@@ -151,7 +153,6 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
   <div class="role-pane">
     <div class="role-box">
       <h2>Sign in to POS</h2>
-      <button class="role-btn scan" onclick="startScanMode()"><b>📷 Scan Item</b><span>Open camera instantly and see the price</span></button>
       <button class="role-btn" onclick="selectRole('Cashier')"><b>Cashier</b><span>Scan items and check prices</span></button>
       <button class="role-btn" onclick="selectRole('Admin')"><b>Admin</b><span>Manage inventory and pricing</span></button>
     </div>
@@ -194,38 +195,34 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
       <span><b id="sel-n">0</b> selected</span>
       <span class="t num"><span id="sel-ll"></span><span class="secondary-total" id="sel-usd"></span></span>
       <div style="flex:1"></div>
-      <button class="btn light" id="sel-clear" style="padding:6px 10px;font-size:.8rem">Clear</button>
+      <button class="btn light" id="sel-clear" style="padding:6px 10px; font-size:0.8rem;">Clear</button>
     </div>
   </main>
 </div>
 
 <div id="scan"><div class="ssn" id="s-sn"></div><div class="sname" id="s-name"></div><div class="sll num" id="s-ll"></div><div class="susd num" id="s-usd"></div></div>
 
-<!-- Full-screen scanner page -->
-<div id="scanpage">
-  <video id="vid" playsinline muted autoplay></video>
-  <div class="frame"></div>
-  <div id="sc-status" style="position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);z-index:4;color:#fff;text-align:center;font-weight:600;text-shadow:0 1px 6px #000;display:none"></div>
-  <div class="sc-top">
-    <button class="circ" id="sc-back" aria-label="Back">←</button>
-    <span class="sc-title" id="sc-title">Scan Item</span>
-    <div style="display:flex;gap:8px">
-      <button class="circ" id="sc-flash" aria-label="Flash" title="Flash">⚡</button>
+<!-- Camera Modal -->
+<div class="overlay" id="cam-overlay">
+  <div class="modal">
+    <h3>Scan Barcode</h3>
+    <div id="scanner-wrapper">
+      <button class="flash-btn" id="flash-toggle" onclick="toggleFlash()">⚡ Flash</button>
+      <div id="interactive"></div>
+    </div>
+    <div class="m-act">
+      <div class="zoom-controls">
+        <button class="zoom-btn" onclick="setZoom(1)">1x</button>
+        <button class="zoom-btn" onclick="setZoom(2)">2x</button>
+        <button class="zoom-btn" onclick="setZoom(3)">3x</button>
+      </div>
+      <button class="btn light" id="switch-camera" type="button">Switch Lens</button>
+      <button class="btn light" id="cam-close">Close</button>
     </div>
   </div>
-  <div class="sc-bottom">
-    <div id="res"><div class="rsn" id="r-sn"></div><div class="rname" id="r-name"></div><div class="rll num" id="r-ll"></div><div class="rusd num" id="r-usd"></div></div>
-    <div class="zoom-row" id="zoom-row">
-      <button class="zb" data-z="1">1x</button>
-      <button class="zb" data-z="2">2x</button>
-      <button class="zb" data-z="3">3x</button>
-      <input type="range" id="zslider" min="1" max="5" step="0.1" value="1">
-      <span id="zlabel">1.0×</span>
-    </div>
-  </div>
-  <div id="hq"></div>
 </div>
 
+<!-- Edit / Add Modal -->
 <div class="overlay" id="overlay">
   <div class="modal" role="dialog" aria-modal="true">
     <h3 id="m-title"></h3>
@@ -241,68 +238,87 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
 <div id="toast"><span class="spin hidden" id="t-spin"></span><span id="t-text"></span></div>
 
 <script>
+// --- SUPABASE CONFIGURATION ---
 const SUPABASE_URL = "https://kkmfhvuwanzugffmytlg.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_pYeJwa6OZPeKW8fI34I7bQ_WdUs5Bfb";
+
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let store = { categories: [] }, admin = false, cat = 0, query = '', sel = new Set();
-let scanT = null, toastT = null;
+let scanT = null, toastT = null, html5QrcodeScanner = null, flashState = false, currentStreamTrack = null;
+let availableCameras = [], activeCameraIndex = 0, cameraStartOptions = null;
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const usd = n => '$' + (Number(n) || 0).toFixed(2);
 const ll = n => 'L.L. ' + (Number(n) || 0).toLocaleString('en-US');
 
-/* ---------- Data ---------- */
+/* ---------- Data Loading from Supabase ---------- */
 async function loadData() {
   try {
     showToast('Loading data...', false, true);
+    
     const { data: catData, error: catErr } = await supabaseClient.from('categories').select('*');
     if (catErr) throw catErr;
+
     const { data: itemData, error: itemErr } = await supabaseClient.from('items').select('*');
     if (itemErr) throw itemErr;
+
     store.categories = (catData || []).map(c => ({
-      id: c.id, name: c.name,
-      items: (itemData || []).filter(i => i.category_id === c.id)
-        .map(i => ({ serial: i.serial, name: i.name, priceUSD: Number(i.price_usd), priceLL: Number(i.price_ll) }))
+      id: c.id,
+      name: c.name,
+      items: (itemData || [])
+        .filter(i => i.category_id === c.id)
+        .map(i => ({
+          serial: i.serial,
+          name: i.name,
+          priceUSD: Number(i.price_usd),
+          priceLL: Number(i.price_ll)
+        }))
     }));
+
     localStorage.setItem('pos_store_data', JSON.stringify(store));
     showToast('Loaded successfully!');
   } catch (e) {
     console.error(e);
     const local = localStorage.getItem('pos_store_data');
-    if (local) { store = JSON.parse(local); showToast('Loaded from local storage (Offline)', true); }
-    else showToast('Failed to load data', true);
+    if (local) {
+      store = JSON.parse(local);
+      showToast('Loaded from local storage (Offline)', true);
+    } else {
+      showToast('Failed to load data', true);
+    }
   }
   render();
 }
 
-/* ---------- Login ---------- */
+/* ---------- Login & Session Persistence ---------- */
 function selectRole(r) {
   admin = r === 'Admin';
   localStorage.setItem('pos_user_role', r);
   $('login').classList.add('hidden');
-  $('app').classList.remove('hidden'); $('role-sub').textContent = r;
+  $('app').classList.remove('hidden');$('role-sub').textContent = r;
   $('admin-tools').classList.toggle('hidden', !admin);
   loadData();
   setTimeout(() => $('q').focus(), 50);
 }
-async function startScanMode() {
-  admin = false;
-  openScanner('login');          // camera opens immediately
-  loadData();                    // prices load in the background
-}
+
 function logout() {
   localStorage.removeItem('pos_user_role');
-  $('app').classList.add('hidden'); $('login').classList.remove('hidden');
+  $('app').classList.add('hidden');$('login').classList.remove('hidden');
   sel.clear(); query = ''; $('q').value = '';
 }
+
+// Auto-login on page load if role exists
 window.addEventListener('DOMContentLoaded', () => {
   const savedRole = localStorage.getItem('pos_user_role');
-  if (savedRole) selectRole(savedRole);
+  if (savedRole) {
+    selectRole(savedRole);
+  }
 });
 
 /* ---------- Render ---------- */
 function render() { renderCats(); renderItems(); renderSel(); }
+
 function renderCats() {
   if (cat >= store.categories.length) cat = 0;
   $('cats').innerHTML = store.categories.map((c, i) => `
@@ -311,6 +327,7 @@ function renderCats() {
       ${admin ? `<button class="cat-del" data-delcat="${i}" title="Delete">&times;</button>` : ''}
     </div>`).join('');
 }
+
 function visibleItems() {
   const q = query.toLowerCase();
   if (q) {
@@ -323,10 +340,11 @@ function visibleItems() {
   const c = store.categories[cat];
   return c ? (c.items || []).map(it => ({ it, ci: cat })) : [];
 }
+
 function renderItems() {
   const g = $('grid');
   if (!store.categories.length) {
-    $('title').textContent = 'No categories'; $('count').textContent = '';
+    $('title').textContent = 'No categories';$('count').textContent = '';
     g.innerHTML = `<div class="empty"><h3>Inventory empty</h3><p>${admin ? 'Add a category to begin.' : ''}</p></div>`;
     return;
   }
@@ -347,10 +365,14 @@ function renderItems() {
       ${admin ? `<div class="acts"><button data-edit>Edit</button><button class="del" data-del>Del</button></div>` : ''}
     </article>`).join('');
 }
+
 function renderSel() {
   let u = 0, l = 0;
   store.categories.forEach(c => (c.items || []).forEach(it => {
-    if (sel.has(it.serial)) { u += Number(it.priceUSD) || 0; l += Number(it.priceLL) || 0; }
+    if (sel.has(it.serial)) {
+      u += Number(it.priceUSD) || 0;
+      l += Number(it.priceLL) || 0;
+    }
   }));
   $('selbar').classList.toggle('hidden', !sel.size);
   $('sel-n').textContent = sel.size;
@@ -358,40 +380,46 @@ function renderSel() {
   $('sel-usd').textContent = usd(u);
 }
 
-/* ---------- UI helpers ---------- */
+/* ---------- UI Helpers ---------- */
 function showToast(text, isError = false, loading = false) {
-  const t = $('toast'); $('t-text').textContent = text;
+  const t = $('toast');$('t-text').textContent = text;
   $('t-spin').classList.toggle('hidden', !loading);
   t.classList.toggle('err', !!isError);
   t.classList.add('show');
   clearTimeout(toastT);
   if (!loading) toastT = setTimeout(() => t.classList.remove('show'), 4000);
 }
+
 let onSave = null;
 function openModal(title, html, save, label = 'Save', danger = false) {
-  $('m-title').textContent = title; $('m-body').innerHTML = html; $('m-err').textContent = '';
-  const b = $('m-save'); b.textContent = label; b.className = 'btn' + (danger ? ' danger' : '');
-  onSave = save; $('overlay').classList.add('open');
+  $('m-title').textContent = title;
+  $('m-body').innerHTML = html;
+  $('m-err').textContent = '';
+  const b = $('m-save');
+  b.textContent = label;
+  b.className = 'btn' + (danger ? ' danger' : '');
+  onSave = save;
+  $('overlay').classList.add('open');
   setTimeout(() => { const f = $('m-body').querySelector('input'); (f || b).focus(); }, 30);
 }
+
 function closeModal() { $('overlay').classList.remove('open'); onSave = null; $('q').focus(); }
+
 function submitModal() {
   if (!onSave) return;
   const err = onSave();
-  if (err && typeof err === 'string') $('m-err').textContent = err;
+  if (err && typeof err === 'string') { $('m-err').textContent = err; }
 }
+
 function confirmBox(msg, fn) {
   openModal('Confirm', `<p style="color:var(--muted)">${esc(msg)}</p>`, () => { fn(); closeModal(); return ''; }, 'Delete', true);
 }
-function findItem(serial) {
+
+function showScan(serial) {
   let found = null;
   store.categories.forEach(c => (c.items || []).forEach(it => {
-    if (!found && it.serial.toLowerCase() === String(serial).trim().toLowerCase()) found = it;
+    if (!found && it.serial.toLowerCase() === serial.toLowerCase()) found = it;
   }));
-  return found;
-}
-function showScan(serial) {          // small popup used by the search box (Enter)
-  const found = findItem(serial);
   $('s-sn').textContent = 'SN: ' + serial;
   $('s-name').textContent = found ? found.name : 'Not Found';
   $('s-ll').textContent = found ? ll(found.priceLL) : '';
@@ -402,302 +430,264 @@ function showScan(serial) {          // small popup used by the search box (Ente
   return !!found;
 }
 
-/* =====================================================================
-   FULL-SCREEN CAMERA SCANNER (portrait, main lens, zoom, autofocus)
-   ===================================================================== */
-let stream = null, track = null, scanning = false, detector = null, fallbackQr = null, busy = false;
-let rearCams = [], camId = null, torchOn = false, lastCode = '', lastTime = 0, scanFrom = 'app';
-let zoomCaps = null, curZoom = 1;
-const vid = $('vid');
-const FORMATS = ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','code_93','itf','codabar','qr_code'];
-
-const isFront = l => /front|user|selfie|facetime/i.test(l || '');
-const isRear = l => /back|rear|environment/i.test(l || '') && !isFront(l);
-const isSecondaryLens = l => /ultra|wide|tele|macro|depth/i.test(l || '');
-
-async function listRearCams() {
-  const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
-  rearCams = devs.filter(d => isRear(d.label))
-    .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
-}
-// Main camera = first rear camera that is not labelled ultra-wide / tele / macro
-function pickMainCam() {
-  return rearCams.find(d => !isSecondaryLens(d.label)) || rearCams[0] || null;
+/* ---------- Android Camera Scanner: capability-aware zoom and focus ---------- */
+function getVideoTrack() {
+  const v = document.querySelector('#interactive video');
+  return v && v.srcObject ? v.srcObject.getVideoTracks()[0] : null;
 }
 
-async function openScanner(from) {
-  scanFrom = from || 'app';
-  $('scanpage').classList.add('open');
-  $('res').classList.remove('show');
-  lastCode = ''; lastTime = 0;
-  try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('portrait'); } catch (_) {}
-  await startStream(null);
-}
-
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-function setStatus(t) { const e = $('sc-status'); e.textContent = t || ''; e.style.display = t ? 'block' : 'none'; }
-async function attachStream() {
-  vid.muted = true; vid.setAttribute('playsinline', ''); vid.setAttribute('muted', '');
-  vid.srcObject = stream;
-  try { await vid.play(); } catch (e) { console.warn('play() failed', e); }
-}
-async function openFirst(deviceId) {
-  const hd = { width: { ideal: 1920 }, height: { ideal: 1080 } };
-  const attempts = deviceId
-    ? [{ deviceId: { exact: deviceId }, ...hd }, { deviceId: { exact: deviceId } }]
-    : [{ facingMode: { ideal: 'environment' }, ...hd }, { facingMode: 'environment' }, true];
-  let lastErr;
-  for (const v of attempts) {
-    try { return await navigator.mediaDevices.getUserMedia({ video: v, audio: false }); }
-    catch (e) { lastErr = e; if (e.name === 'NotAllowedError' || e.name === 'SecurityError') throw e; await sleep(200); }
+// Best-effort autofocus for Android browsers. Web browsers do not expose a
+// standard API for choosing the exact focus point under a finger, but some
+// camera tracks accept single-shot/continuous focus constraints.
+async function requestCameraFocus(showMessage = false) {
+  const track = currentStreamTrack || getVideoTrack();
+  if (!track || track.readyState !== 'live') {
+    if (showMessage) showToast('Camera is not ready to focus yet.', true);
+    return false;
   }
-  throw lastErr;
-}
-async function probeBestCam() {
-  // Open each rear camera briefly and score it: the main lens has autofocus + hardware zoom,
-  // the ultra-wide (0.5x) usually has neither.
-  if (rearCams.length < 2) return rearCams[0] ? rearCams[0].id : null;
-  let best = null, bestScore = -1e9;
-  for (let i = 0; i < Math.min(rearCams.length, 5); i++) {
-    const d = rearCams[i];
-    try {
-      const st = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: d.id } }, audio: false });
-      const t = st.getVideoTracks()[0];
-      const c = t.getCapabilities ? t.getCapabilities() : {};
-      let sc = 0;
-      if (c.zoom) sc += 4;
-      if (c.zoom && Number(c.zoom.max) >= 4) sc += 1;
-      if (c.focusMode && c.focusMode.includes('continuous')) sc += 2;
-      if (isSecondaryLens(d.label)) sc -= 5;
-      sc -= i * 0.1;
-      if (sc > bestScore) { bestScore = sc; best = d.id; }
-      st.getTracks().forEach(x => x.stop());
-      await sleep(250);
-    } catch (e) { console.warn('probe failed', d.label, e); await sleep(250); }
-  }
-  return best;
-}
-
-async function startStream(deviceId) {
-  stopStream(false);
-  setStatus('Starting camera…');
   try {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw Object.assign(new Error('no mediaDevices'), { name: 'InsecureContext' });
-    stream = await openFirst(deviceId);
-    track = stream.getVideoTracks()[0];
-    await attachStream();                 // preview shows immediately
-
-    if (!deviceId) {                      // find & switch to the MAIN rear lens (1x)
-      await listRearCams();
-      const cur = track.getSettings().deviceId;
-      let mainId = localStorage.getItem('pos_main_cam');
-      if (!rearCams.some(d => d.id === mainId)) mainId = null;
-      if (!mainId) {
-        stream.getTracks().forEach(t => t.stop());
-        await sleep(300);
-        mainId = await probeBestCam();
-        if (mainId) localStorage.setItem('pos_main_cam', mainId);
-      } else if (mainId !== cur) {
-        stream.getTracks().forEach(t => t.stop());
-        await sleep(300);
-      }
-      if (!stream.active || mainId !== cur) {
-        try { stream = await openFirst(mainId || null); }
-        catch (e) { console.warn('Main lens failed', e); localStorage.removeItem('pos_main_cam'); await sleep(300); stream = await openFirst(null); }
-        track = stream.getVideoTracks()[0];
-        await attachStream();
-      }
-    }
-    camId = track.getSettings().deviceId || deviceId;
-    $('sc-title').textContent = 'Scan Item' + (track.label ? ' · ' + track.label.replace(/,?\s*facing back/i, '') : '');
-    setStatus('');
-    await setupCameraControls();
-    startDetection();
-  } catch (err) {
-    console.error('Camera error:', err);
-    let msg = 'Camera error: ' + (err && (err.name || err.message));
-    if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) msg = 'Camera permission blocked. Chrome ⋮ → Site settings → Camera → Allow, then reload.';
-    else if (err && err.name === 'InsecureContext') msg = 'Camera needs HTTPS. Open this page from an https:// link in Chrome.';
-    else if (err && err.name === 'NotFoundError') msg = 'No camera found.';
-    else if (err && (err.name === 'NotReadableError' || err.name === 'TrackStartError' || err.name === 'AbortError')) msg = 'Camera is busy. Close the Camera app / other tabs, then press back and try again.';
-    setStatus(msg); showToast(msg, true);
-  }
-}
-
-let digitalZoom = false;
-function zoomRange() {
-  if (zoomCaps && !digitalZoom) return { min: Math.max(1, Number(zoomCaps.min) || 1), max: Math.min(Number(zoomCaps.max) || 1, 10), step: Number(zoomCaps.step) || 0.1 };
-  return { min: 1, max: 5, step: 0.1 };
-}
-async function setupCameraControls() {
-  torchOn = false; $('sc-flash').classList.remove('on');
-  const caps = track.getCapabilities ? track.getCapabilities() : {};
-  try {
-    if (caps.focusMode && caps.focusMode.includes('continuous'))
-      await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-  } catch (_) {}
-  zoomCaps = caps.zoom || null;
-  digitalZoom = !zoomCaps;                       // no hardware zoom -> digital zoom fallback
-  vid.style.transform = ''; curZoom = 1;
-  $('sc-flash').style.display = caps.torch ? '' : 'none';
-  $('zoom-row').style.display = 'flex';
-  const r = zoomRange(), sl = $('zslider');
-  sl.min = r.min; sl.max = r.max; sl.step = r.step;
-  await setZoom(1);
-}
-async function setZoom(z) {
-  if (!track) return;
-  const r = zoomRange();
-  z = Math.min(Math.max(Number(z), r.min), r.max);
-  if (!digitalZoom) {
-    try { await track.applyConstraints({ advanced: [{ zoom: z }] }); }
-    catch (e) {
-      try { await track.applyConstraints({ zoom: z }); }
-      catch (e2) { console.warn('Hardware zoom failed, using digital', e2); digitalZoom = true; }
-    }
-  }
-  vid.style.transform = digitalZoom ? 'scale(' + z + ')' : '';
-  curZoom = z;
-  $('zslider').value = z;
-  $('zlabel').textContent = z.toFixed(1) + '×' + (digitalZoom ? ' D' : '');
-  document.querySelectorAll('.zb').forEach(b => b.classList.toggle('on', Math.abs(Number(b.dataset.z) - z) < 0.15));
-}
-
-async function toggleTorch() {
-  if (!track) return;
-  try {
-    torchOn = !torchOn;
-    await track.applyConstraints({ advanced: [{ torch: torchOn }] });
-    $('sc-flash').classList.toggle('on', torchOn);
-  } catch (e) { torchOn = false; showToast('Flash not available', true); }
-}
-
-/* ----- Detection ----- */
-function startDetection() {
-  scanning = true;
-  if (!detector && !fallbackQr && 'BarcodeDetector' in window) {
-    try { detector = new BarcodeDetector({ formats: FORMATS }); }
-    catch (_) { try { detector = new BarcodeDetector(); } catch (__) { detector = null; } }
-  }
-  if (!detector && !fallbackQr && window.Html5Qrcode) {
-    fallbackQr = new Html5Qrcode('hq', { verbose: false });
-  }
-  loop();
-}
-async function loop() {
-  if (!scanning) return;
-  if (vid.readyState >= 2 && !busy) {
-    busy = true;
-    try {
-      if (detector) {
-        const codes = await detector.detect(vid);
-        if (codes.length) onCode(codes[0].rawValue);
-      } else if (fallbackQr) {
-        const c = document.createElement('canvas');
-        c.width = vid.videoWidth; c.height = vid.videoHeight;
-        c.getContext('2d').drawImage(vid, 0, 0);
-        const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', .85));
-        const text = await fallbackQr.scanFile(new File([blob], 'f.jpg', { type: 'image/jpeg' }), false);
-        if (text) onCode(text);
-      }
-    } catch (_) {}
-    busy = false;
-  }
-  setTimeout(loop, detector ? 80 : 350);
-}
-function onCode(code) {
-  const now = Date.now();
-  if (code === lastCode && now - lastTime < 2500) return;   // ignore repeats
-  lastCode = code; lastTime = now;
-  if (navigator.vibrate) navigator.vibrate(60);
-  const found = findItem(code);
-  const res = $('res');
-  res.classList.add('show'); res.classList.toggle('nf', !found);
-  $('r-sn').textContent = 'SN: ' + code;
-  $('r-name').textContent = found ? found.name : 'Item not found';
-  $('r-ll').textContent = found ? ll(found.priceLL) : '';
-  $('r-usd').textContent = found ? usd(found.priceUSD) : '';
-}
-
-function stopStream(hide = true) {
-  scanning = false;
-  if (stream) stream.getTracks().forEach(t => t.stop());
-  stream = null; track = null; vid.srcObject = null;
-  if (hide) $('scanpage').classList.remove('open');
-}
-function closeScanner() {
-  stopStream(true);
-  try { screen.orientation && screen.orientation.unlock && screen.orientation.unlock(); } catch (_) {}
-  if (scanFrom === 'app') setTimeout(() => $('q').focus(), 50);
-}
-
-$('sc-back').addEventListener('click', closeScanner);
-$('sc-flash').addEventListener('click', toggleTorch);
-$('zslider').addEventListener('input', e => setZoom(e.target.value));
-document.querySelectorAll('.zb').forEach(b => b.addEventListener('click', () => setZoom(b.dataset.z)));
-$('open-cam').addEventListener('click', () => openScanner('app'));
-
-// Pinch to zoom
-let pinchD = 0, pinchZ = 1;
-const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-$('scanpage').addEventListener('touchstart', e => { if (e.touches.length === 2) { pinchD = dist(e.touches); pinchZ = curZoom; } }, { passive: true });
-$('scanpage').addEventListener('touchmove', e => { if (e.touches.length === 2 && pinchD) setZoom(pinchZ * dist(e.touches) / pinchD); }, { passive: true });
-$('scanpage').addEventListener('touchend', () => { pinchD = 0; });
-
-// Tap to focus (tries every focus method the camera exposes)
-let focusBusy = false;
-function focusRing(x, y, ok) {
-  const r = document.createElement('div');
-  r.style.cssText = 'position:absolute;z-index:6;width:76px;height:76px;margin:-38px 0 0 -38px;border:2px solid ' + (ok ? '#10b981' : '#f59e0b') + ';border-radius:50%;pointer-events:none;transition:all .35s;left:' + x + 'px;top:' + y + 'px;transform:scale(1.5);opacity:1';
-  $('scanpage').appendChild(r);
-  requestAnimationFrame(() => { r.style.transform = 'scale(1)'; });
-  setTimeout(() => { r.style.opacity = '0'; }, 700);
-  setTimeout(() => r.remove(), 1100);
-}
-async function refocus(e) {
-  if (!track || focusBusy) return;
-  const rect = $('scanpage').getBoundingClientRect();
-  const px = e.clientX - rect.left, py = e.clientY - rect.top;
-  const caps = track.getCapabilities ? track.getCapabilities() : {};
-  const modes = caps.focusMode || [];
-  const nx = Math.min(1, Math.max(0, e.clientX / innerWidth)), ny = Math.min(1, Math.max(0, e.clientY / innerHeight));
-  focusBusy = true;
-  let ok = false;
-  try {
-    // 1) point of interest + single-shot (best, if supported)
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    const modes = Array.isArray(caps.focusMode) ? caps.focusMode : [];
     if (modes.includes('single-shot')) {
-      try { await track.applyConstraints({ advanced: [{ focusMode: 'single-shot', pointsOfInterest: [{ x: nx, y: ny }] }] }); ok = true; }
-      catch (_) { await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] }); ok = true; }
-    }
-    // 2) otherwise kick the autofocus: manual -> continuous restarts the AF scan
-    else if (modes.includes('continuous')) {
-      if (modes.includes('manual')) {
-        await track.applyConstraints({ advanced: [{ focusMode: 'manual' }] });
-        await sleep(180);
+      await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
+      // Restore continuous autofocus if supported, so the camera keeps
+      // adjusting while the barcode moves closer/farther away.
+      if (modes.includes('continuous')) {
+        await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
       }
-      await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-      ok = true;
+      return true;
     }
-    // 3) nothing exposed
-    if (!modes.length) showToast('This phone does not let Chrome control focus. Keep the phone ~10–15 cm from the barcode.', true);
-    else if (modes.includes('single-shot')) setTimeout(() => { track && modes.includes('continuous') && track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {}); }, 1800);
-  } catch (err) { console.warn('focus failed', err); ok = false; }
-  focusRing(px, py, ok);
-  setTimeout(() => { focusBusy = false; }, 400);
+    if (modes.includes('continuous')) {
+      await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+      return true;
+    }
+    if (showMessage) showToast('This camera does not expose focus controls to Chrome. Move the barcode slightly closer or farther.', true);
+    return false;
+  } catch (e) {
+    console.warn('Camera autofocus request was not supported:', e);
+    if (showMessage) showToast('Chrome cannot control focus on this camera. Try moving the phone slightly closer or farther.', true);
+    return false;
+  }
 }
-$('scanpage').addEventListener('click', e => {
-  if (e.target.closest('button,input,#res,.zoom-row')) return;
-  refocus(e);
-});
 
-// Release camera when the tab is hidden, reopen when back
-document.addEventListener('visibilitychange', () => {
-  const open = $('scanpage').classList.contains('open');
-  if (document.hidden && stream) stopStream(false);
-  else if (!document.hidden && open && !stream) startStream(camId);
-});
+async function applyCameraZoom(zoomLevel, showMessage = true) {
+  const track = currentStreamTrack || getVideoTrack();
+  if (!track || track.readyState !== 'live') {
+    if (showMessage) showToast('Camera is still starting. Try again in a moment.', true);
+    return false;
+  }
+  try {
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    if (!caps.zoom) {
+      if (showMessage) showToast('Hardware zoom is not supported by this camera. Move the phone closer.', true);
+      return false;
+    }
+    const min = Number(caps.zoom.min ?? 1);
+    const max = Number(caps.zoom.max ?? 1);
+    const step = Number(caps.zoom.step ?? 0.1);
+    const requested = Math.min(Math.max(Number(zoomLevel), min), max);
+    const z = step > 0 ? Math.round((requested - min) / step) * step + min : requested;
+    await track.applyConstraints({ advanced: [{ zoom: Math.min(max, Math.max(min, z)) }] });
+    if (showMessage) showToast('Camera zoom: ' + z.toFixed(1) + '×');
+    return true;
+  } catch (e) {
+    console.warn('Camera zoom could not be applied:', e);
+    if (showMessage) showToast('Zoom could not be applied on this Android camera.', true);
+    return false;
+  }
+}
 
-/* ---------- Admin DB actions ---------- */
+async function ensureScanner() {
+  if (!html5QrcodeScanner) html5QrcodeScanner = new Html5Qrcode('interactive', {
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.ITF,
+      Html5QrcodeSupportedFormats.QR_CODE
+    ],
+    verbose: false
+  });
+  return html5QrcodeScanner;
+}
+
+function isFrontCameraLabel(label) {
+  return /front|user[- ]?facing|facetime|selfie/i.test(label || '');
+}
+
+function isRearCameraLabel(label) {
+  return /back|rear|environment|facing back|telephoto|tele|wide|ultra.?wide/i.test(label || '');
+}
+
+async function refreshCameraList() {
+  const button = $('switch-camera');
+  try {
+    const devices = await Html5Qrcode.getCameras();
+    availableCameras = (devices || []).filter(d => d.id);
+    const track = currentStreamTrack || getVideoTrack();
+    const settings = track && track.getSettings ? track.getSettings() : {};
+    const activeId = settings.deviceId || null;
+    const activeIndex = availableCameras.findIndex(d => d.id === activeId);
+    if (activeIndex >= 0) activeCameraIndex = activeIndex;
+
+    // Only offer cameras explicitly identified as rear-facing. Never cycle to
+    // an unknown camera as a fallback, because that often switches to selfie.
+    const labelledRear = availableCameras.filter(d => isRearCameraLabel(d.label) && !isFrontCameraLabel(d.label));
+    const hasNamedRearAlternative = labelledRear.some(d => d.id !== activeId);
+    button.disabled = !hasNamedRearAlternative;
+    button.textContent = hasNamedRearAlternative ? 'Switch Rear Lens' : 'Rear Lens Unavailable';
+    button.title = hasNamedRearAlternative
+      ? 'Switch between rear cameras exposed by Chrome'
+      : 'Chrome has not exposed another identifiable rear camera';
+  } catch (e) {
+    console.warn('Could not enumerate cameras:', e);
+    availableCameras = [];
+    // Keep scanning usable even when enumeration is blocked by the browser.
+    button.disabled = true;
+    button.textContent = 'Rear Lens Unavailable';
+    button.title = 'Camera scanning can continue; Chrome did not provide a camera list';
+  }
+}
+
+async function startCameraScanner(cameraId = null) {
+  $('cam-overlay').classList.add('open');
+  $('switch-camera').disabled = true;
+  $('switch-camera').textContent = 'Finding cameras…';
+  flashState = false;
+  $('flash-toggle').textContent = '⚡ Flash';
+
+  let scanner;
+  try {
+    scanner = await ensureScanner();
+    if (scanner.isScanning) {
+      await refreshCameraList();
+      return;
+    }
+
+    const config = {
+      fps: 12,
+      qrbox: (viewWidth, viewHeight) => {
+        const width = Math.max(180, Math.min(Math.floor(viewWidth * 0.88), 360));
+        const height = Math.max(90, Math.min(Math.floor(viewHeight * 0.32), 160));
+        return { width, height };
+      },
+      aspectRatio: 1.333
+    };
+    const onSuccess = decodedText => {
+      stopCameraScanner();
+      showScan(decodedText);
+    };
+    const onFailure = () => {};
+
+    // html5-qrcode expects facingMode as a plain string, not a nested
+    // MediaTrackConstraints object. Prefer a selected device ID when supplied.
+    try {
+      await scanner.start(cameraId || { facingMode: 'environment' }, config, onSuccess, onFailure);
+    } catch (firstError) {
+      console.warn('Preferred camera start failed; trying enumerated rear camera:', firstError);
+      if (scanner.isScanning) {
+        try { await scanner.stop(); } catch (_) {}
+      }
+      // Do not pick the last enumerated device: on some Samsung phones that is
+      // the front camera. If a chosen device fails, retry the rear-facing mode.
+      if (cameraId) {
+        await scanner.start({ facingMode: 'environment' }, config, onSuccess, onFailure);
+      } else {
+        throw firstError;
+      }
+    }
+
+    currentStreamTrack = getVideoTrack();
+    await refreshCameraList();
+
+    // Optional focus setup must never prevent the preview from opening.
+    window.setTimeout(() => { requestCameraFocus(false); }, 500);
+  } catch (err) {
+    console.error('Camera startup failed:', err);
+    $('cam-overlay').classList.remove('open');
+    let message = 'Could not open camera. Check Chrome camera permission and use HTTPS.';
+    if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
+      message = 'Camera permission denied. In Chrome, allow Camera for this website and try again.';
+    } else if (err && (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError')) {
+      message = 'No camera was found. Check Android camera permission and try again.';
+    } else if (err && (err.name === 'NotReadableError' || err.name === 'TrackStartError')) {
+      message = 'Camera is busy. Close the Camera app and other scanner tabs, then retry.';
+    }
+    showToast(message, true);
+    if (scanner && scanner.isScanning) {
+      try { await scanner.stop(); } catch (_) {}
+    }
+  }
+}
+
+async function switchCameraLens() {
+  const scanner = html5QrcodeScanner;
+  if (!scanner || !scanner.isScanning) return showToast('Open the scanner first.', true);
+
+  await refreshCameraList();
+  const track = currentStreamTrack || getVideoTrack();
+  const activeId = track && track.getSettings ? track.getSettings().deviceId : null;
+  const rearCameras = availableCameras.filter(d => isRearCameraLabel(d.label) && !isFrontCameraLabel(d.label));
+  const alternatives = rearCameras.filter(d => d.id !== activeId);
+
+  if (!alternatives.length) {
+    showToast('Chrome exposes no other identifiable rear lens. The current rear camera is still active.', true);
+    return;
+  }
+
+  const target = alternatives[0];
+  try {
+    await scanner.stop();
+    currentStreamTrack = null;
+    flashState = false;
+    $('flash-toggle').textContent = '⚡ Flash';
+    await startCameraScanner(target.id);
+    if (scanner.isScanning) showToast('Switched to rear camera: ' + (target.label || 'rear camera'));
+  } catch (e) {
+    console.error('Switch rear camera failed:', e);
+    showToast('Could not switch rear lens. Chrome may expose only one rear camera.', true);
+  }
+}
+
+async function setZoom(zoomLevel) {
+  await applyCameraZoom(zoomLevel, true);
+}
+
+async function toggleFlash() {
+  const track = currentStreamTrack || getVideoTrack();
+  if (!track) return showToast('Camera stream not active', true);
+  const caps = track.getCapabilities ? track.getCapabilities() : {};
+  if (!caps.torch) return showToast('Flashlight not supported by this camera', true);
+  const next = !flashState;
+  try {
+    await track.applyConstraints({ advanced: [{ torch: next }] });
+    flashState = next;
+    $('flash-toggle').textContent = flashState ? '⚡ Flash (On)' : '⚡ Flash';
+  } catch (e) {
+    showToast('Flashlight could not be changed on this device', true);
+  }
+}
+
+function stopCameraScanner() {
+  const scanner = html5QrcodeScanner;
+  currentStreamTrack = null;
+  const close = () => {
+    $('cam-overlay').classList.remove('open');
+    flashState = false;
+    $('flash-toggle').textContent = '⚡ Flash';
+  };
+  if (scanner && scanner.isScanning) {
+    scanner.stop().then(close).catch(err => {
+      console.warn('Could not stop scanner cleanly:', err);
+      close();
+    });
+  } else close();
+}
+
+/* ---------- Admin Database Actions (Supabase) ---------- */
 const field = (id, label, type = 'text', val = '', extra = '') =>
   `<div class="fg"><label for="${id}">${label}</label><input id="${id}" type="${type}" value="${esc(val)}" ${extra}></div>`;
 
@@ -706,30 +696,36 @@ async function addCategory() {
     const name = $('f-name').value.trim();
     if (!name) return 'Enter a category name.';
     const id = 'cat_' + Date.now();
+    
     showToast('Saving...', false, true);
     const { error } = await supabaseClient.from('categories').insert([{ id, name }]);
     if (error) { showToast(error.message, true); return error.message; }
+
     store.categories.push({ id, name, items: [] });
     cat = store.categories.length - 1; query = ''; $('q').value = '';
     render(); closeModal(); showToast('Category added!');
   });
 }
+
 async function addItem() {
   if (!store.categories.length) return showToast('Create a category first.', true);
   openModal('Add Product',
     field('f-serial', 'Barcode / Serial') + field('f-name', 'Product Name') +
     field('f-usd', 'Price (USD)', 'number', '', 'step="0.01" min="0"') + field('f-ll', 'Price (L.L.)', 'number', '0', 'min="0"'), async () => {
-    const serial = $('f-serial').value.trim(), name = $('f-name').value.trim();
+    const serial = $('f-serial').value.trim(), name =$('f-name').value.trim();
     const price_usd = parseFloat($('f-usd').value), price_ll = parseFloat($('f-ll').value) || 0;
     if (!serial || !name || isNaN(price_usd)) return 'Fields required.';
+
     showToast('Saving...', false, true);
     const category_id = store.categories[cat].id;
     const { error } = await supabaseClient.from('items').insert([{ serial, category_id, name, price_usd, price_ll }]);
     if (error) { showToast(error.message, true); return error.message; }
+
     (store.categories[cat].items = store.categories[cat].items || []).push({ serial, name, priceUSD: price_usd, priceLL: price_ll });
     render(); closeModal(); showToast('Product added!');
   });
 }
+
 async function editItem(ci, serial) {
   const item = (store.categories[ci].items || []).find(i => i.serial === serial);
   if (!item) return;
@@ -739,13 +735,16 @@ async function editItem(ci, serial) {
     field('f-ll', 'Price (L.L.)', 'number', item.priceLL || 0, 'min="0"'), async () => {
     const name = $('f-name').value.trim(), price_usd = parseFloat($('f-usd').value), price_ll = parseFloat($('f-ll').value) || 0;
     if (!name || isNaN(price_usd)) return 'Fields required.';
+
     showToast('Updating...', false, true);
     const { error } = await supabaseClient.from('items').update({ name, price_usd, price_ll }).eq('serial', serial);
     if (error) { showToast(error.message, true); return error.message; }
+
     item.name = name; item.priceUSD = price_usd; item.priceLL = price_ll;
     render(); closeModal(); showToast('Product updated!');
   });
 }
+
 async function delItem(ci, serial) {
   confirmBox('Remove product?', async () => {
     showToast('Deleting...', false, true);
@@ -756,8 +755,9 @@ async function delItem(ci, serial) {
     render(); showToast('Product deleted');
   });
 }
+
 async function delCat(i) {
-  confirmBox('Delete category and all its items?', async () => {
+  confirmBox(`Delete category and all its items?`, async () => {
     showToast('Deleting...', false, true);
     const catId = store.categories[i].id;
     await supabaseClient.from('categories').delete().eq('id', catId);
@@ -766,23 +766,32 @@ async function delCat(i) {
   });
 }
 
-/* ---------- Events ---------- */
-$('logout').addEventListener('click', logout); $('add-cat').addEventListener('click', addCategory);
-$('add-item').addEventListener('click', addItem); $('m-cancel').addEventListener('click', closeModal);
-$('m-save').addEventListener('click', submitModal);
-$('overlay').addEventListener('mousedown', e => { if (e.target === $('overlay')) closeModal(); });
-$('sel-clear').addEventListener('click', () => { sel.clear(); renderItems(); renderSel(); });
+/* ---------- Event Listeners ---------- */
+$('logout').addEventListener('click', logout);$('add-cat').addEventListener('click', addCategory);
+$('add-item').addEventListener('click', addItem);$('m-cancel').addEventListener('click', closeModal);
+$('m-save').addEventListener('click', submitModal);$('overlay').addEventListener('mousedown', e => { if (e.target === $('overlay')) closeModal(); });$('sel-clear').addEventListener('click', () => { sel.clear(); renderItems(); renderSel(); });
 
-const closeDrawer = () => { $('sidebar').classList.remove('mobile-open'); $('drawer-backdrop').classList.remove('open'); };
-$('open-menu').addEventListener('click', () => { $('sidebar').classList.add('mobile-open'); $('drawer-backdrop').classList.add('open'); });
-$('close-menu').addEventListener('click', closeDrawer); $('drawer-backdrop').addEventListener('click', closeDrawer);
+const closeDrawer = () => {
+  $('sidebar').classList.remove('mobile-open');$('drawer-backdrop').classList.remove('open');
+};
+$('open-menu').addEventListener('click', () => {
+  $('sidebar').classList.add('mobile-open');$('drawer-backdrop').classList.add('open');
+});
+$('close-menu').addEventListener('click', closeDrawer);$('drawer-backdrop').addEventListener('click', closeDrawer);
+
+$('open-cam').addEventListener('click', () => startCameraScanner());$('switch-camera').addEventListener('click', switchCameraLens);$('cam-close').addEventListener('click', stopCameraScanner);
+$('interactive').addEventListener('click', event => { if (event.target && event.target.tagName === 'VIDEO') requestCameraFocus(true); });
 
 $('cats').addEventListener('click', e => {
   const d = e.target.closest('[data-delcat]');
   if (d) return delCat(+d.dataset.delcat);
   const b = e.target.closest('[data-i]');
-  if (b) { cat = +b.dataset.i; query = ''; $('q').value = ''; render(); closeDrawer(); }
+  if (b) { 
+    cat = +b.dataset.i; query = ''; $('q').value = ''; render(); 
+    closeDrawer();
+  }
 });
+
 function toggle(serial) { sel.has(serial) ? sel.delete(serial) : sel.add(serial); renderItems(); renderSel(); }
 $('grid').addEventListener('click', e => {
   const card = e.target.closest('.card'); if (!card) return;
@@ -791,6 +800,7 @@ $('grid').addEventListener('click', e => {
   if (e.target.closest('[data-del]')) return delItem(ci, s);
   toggle(s);
 });
+
 const q = $('q');
 q.addEventListener('input', () => { query = q.value.trim(); render(); });
 q.addEventListener('keydown', e => {
@@ -798,7 +808,7 @@ q.addEventListener('keydown', e => {
   e.preventDefault();
   const v = q.value.trim(); if (!v) return;
   showScan(v);
-  q.value = ''; query = ''; render();
+  if (v) { q.value = ''; query = ''; render(); }
 });
 </script>
 </body>
