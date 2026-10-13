@@ -130,6 +130,8 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
 .zb.on{background:var(--accent);color:#000;border-color:var(--accent)}
 #zlabel{color:#fff;font-weight:700;min-width:44px;text-align:center;text-shadow:0 1px 4px #000}
 #hq{display:none}
+.frame.ok{border-color:#fff;box-shadow:0 0 0 100vmax rgba(16,185,129,.35)}
+#sc-hint{position:absolute;left:0;right:0;top:calc(36% + 140px);z-index:4;text-align:center;color:#fff;font-weight:600;font-size:.9rem;text-shadow:0 1px 6px #000;padding:0 20px;display:none}
 
 @media (max-width:768px){
   #login{grid-template-columns:1fr}
@@ -205,6 +207,7 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
 <div id="scanpage">
   <video id="vid" playsinline muted autoplay></video>
   <div class="frame"></div>
+  <div id="sc-hint"></div>
   <div id="sc-status" style="position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);z-index:4;color:#fff;text-align:center;font-weight:600;text-shadow:0 1px 6px #000;display:none"></div>
   <div class="sc-top">
     <button class="circ" id="sc-back" aria-label="Back">←</button>
@@ -426,6 +429,7 @@ function pickMainCam() {
 }
 
 async function openScanner(from) {
+  primeAudio();
   scanFrom = from || 'app';
   $('scanpage').classList.add('open');
   $('res').classList.remove('show');
@@ -524,6 +528,7 @@ async function startStream(deviceId) {
   }
 }
 
+const DEFAULT_ZOOM = 2;
 let digitalZoom = false;
 function zoomRange() {
   if (zoomCaps && !digitalZoom) return { min: Math.max(1, Number(zoomCaps.min) || 1), max: Math.min(Number(zoomCaps.max) || 1, 10), step: Number(zoomCaps.step) || 0.1 };
@@ -543,7 +548,7 @@ async function setupCameraControls() {
   $('zoom-row').style.display = 'flex';
   const r = zoomRange(), sl = $('zslider');
   sl.min = r.min; sl.max = r.max; sl.step = r.step;
-  await setZoom(1);
+  await setZoom(digitalZoom ? 1 : Math.min(DEFAULT_ZOOM, zoomRange().max));
 }
 async function setZoom(z) {
   if (!track) return;
@@ -574,7 +579,7 @@ async function toggleTorch() {
 
 /* ----- Detection ----- */
 function startDetection() {
-  scanning = true;
+  scanning = true; lastAct = Date.now(); lastNudge = 0; setHint('');
   if (!detector && !fallbackQr && 'BarcodeDetector' in window) {
     try { detector = new BarcodeDetector({ formats: FORMATS }); }
     catch (_) { try { detector = new BarcodeDetector(); } catch (__) { detector = null; } }
@@ -586,6 +591,7 @@ function startDetection() {
 }
 async function loop() {
   if (!scanning) return;
+  autoNudge();
   if (vid.readyState >= 2 && !busy) {
     busy = true;
     try {
@@ -605,11 +611,42 @@ async function loop() {
   }
   setTimeout(loop, detector ? 80 : 350);
 }
+let actx = null, lastAct = Date.now(), lastNudge = 0;
+function primeAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (_) {} }
+function beep() {
+  try {
+    primeAudio();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'square'; o.frequency.value = 1800; g.gain.value = .08;
+    o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + .12);
+  } catch (_) {}
+}
+function setHint(t) { const e = $('sc-hint'); e.textContent = t || ''; e.style.display = t ? 'block' : 'none'; }
+async function afKick() {                     // restart the camera's own autofocus
+  if (!track || focusBusy) return;
+  const modes = (track.getCapabilities ? track.getCapabilities() : {}).focusMode || [];
+  try {
+    if (modes.includes('continuous')) {
+      if (modes.includes('manual')) { await track.applyConstraints({ advanced: [{ focusMode: 'manual' }] }); await sleep(150); }
+      await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+    }
+  } catch (_) {}
+}
+function autoNudge() {                        // nothing scanned for a while: help the user + re-trigger AF
+  const now = Date.now();
+  if (now - lastAct > 3500 && now - lastNudge > 3500) {
+    lastNudge = now; afKick();
+    setHint('Hold 15–20 cm away · keep barcode flat · tap to focus');
+  }
+}
 function onCode(code) {
   const now = Date.now();
+  lastAct = now; setHint('');
   if (code === lastCode && now - lastTime < 2500) return;   // ignore repeats
   lastCode = code; lastTime = now;
   if (navigator.vibrate) navigator.vibrate(60);
+  beep();
+  const fr = document.querySelector('.frame'); fr.classList.add('ok'); setTimeout(() => fr.classList.remove('ok'), 350);
   const found = findItem(code);
   const res = $('res');
   res.classList.add('show'); res.classList.toggle('nf', !found);
@@ -701,7 +738,7 @@ async function refocus(e) {
   focusBusy = true;
   let ok = false;
   try {
-    if (caps.focusDistance && modes.includes('manual') && vid.videoWidth) {
+    if (caps.focusDistance && modes.includes('manual') && !modes.includes('continuous') && vid.videoWidth) {
       showToast('Focusing… hold steady', false, true);
       const v = await sweepFocus(caps);
       showToast('Focused');
