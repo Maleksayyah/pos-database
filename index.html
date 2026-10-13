@@ -112,7 +112,7 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
 .frame::after{content:"";position:absolute;left:8%;right:8%;height:2px;background:var(--accent);box-shadow:0 0 12px var(--accent);animation:ln 2s ease-in-out infinite}
 @keyframes ln{0%,100%{top:12%}50%{top:88%}}
 .sc-top{position:absolute;top:0;left:0;right:0;display:flex;gap:10px;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 12px) 14px 12px;z-index:5}
-.sc-top .sc-title{color:#fff;font-weight:600;text-shadow:0 1px 4px #000}
+.sc-top .sc-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.85rem;color:#fff;font-weight:600;text-shadow:0 1px 4px #000}
 .circ{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:1.2rem;border:1px solid rgba(255,255,255,.25);display:grid;place-items:center;padding:0}
 .circ.on{background:var(--accent);color:#000}
 .sc-bottom{position:absolute;left:0;right:0;bottom:0;padding:12px 14px calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;flex-direction:column;gap:12px;z-index:5;background:linear-gradient(transparent,rgba(0,0,0,.75) 30%)}
@@ -212,12 +212,15 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
   <div class="sc-top">
     <button class="circ" id="sc-back" aria-label="Back">←</button>
     <span class="sc-title" id="sc-title">Scan Item</span>
-    <div style="display:flex;gap:8px">
+    <div style="display:flex;gap:6px">
+      <button class="circ" id="sc-batch" aria-label="Batch mode" title="Batch mode: scan many items, running total">🧾</button>
+      <button class="circ" id="sc-gallery" aria-label="Scan from gallery" title="Scan from gallery">🖼</button>
+      <button class="circ" id="sc-photo" aria-label="Photo scan" title="Take a photo with the phone camera app (best focus)">📸</button>
       <button class="circ" id="sc-flash" aria-label="Flash" title="Flash">⚡</button>
     </div>
   </div>
   <div class="sc-bottom">
-    <div id="res"><div class="rsn" id="r-sn"></div><div class="rname" id="r-name"></div><div class="rll num" id="r-ll"></div><div class="rusd num" id="r-usd"></div></div>
+    <div id="res"><div class="rsn" id="r-sn"></div><div class="rname" id="r-name"></div><div class="rll num" id="r-ll"></div><div class="rusd num" id="r-usd"></div><div id="r-batch" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-weight:700;color:var(--accent)"></div><button class="btn light" id="r-clear" style="display:none;margin-top:8px;padding:6px 12px;font-size:.8rem">Clear batch</button></div>
     <div class="zoom-row" id="zoom-row">
       <button class="zb" data-z="1">1x</button>
       <button class="zb" data-z="2">2x</button>
@@ -227,6 +230,8 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
     </div>
   </div>
   <div id="hq"></div>
+  <input type="file" id="f-photo" accept="image/*" capture="environment" class="hidden">
+  <input type="file" id="f-gallery" accept="image/*" class="hidden">
 </div>
 
 <div class="overlay" id="overlay">
@@ -611,6 +616,7 @@ async function loop() {
   }
   setTimeout(loop, detector ? 80 : 350);
 }
+let seenAt = 0, nudgeN = 0, batch = false, batchList = new Map();
 let actx = null, lastAct = Date.now(), lastNudge = 0;
 function primeAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (_) {} }
 function beep() {
@@ -636,18 +642,21 @@ function autoNudge() {                        // nothing scanned for a while: he
   const now = Date.now();
   if (now - lastAct > 3500 && now - lastNudge > 3500) {
     lastNudge = now; afKick();
+    if (!digitalZoom && zoomCaps) setZoom([3, 1.5, 2][nudgeN++ % 3]);
     setHint('Hold 15–20 cm away · keep barcode flat · tap to focus');
   }
 }
 function onCode(code) {
   const now = Date.now();
   lastAct = now; setHint('');
-  if (code === lastCode && now - lastTime < 2500) return;   // ignore repeats
+  const gap = now - seenAt; seenAt = now;
+  if (code === lastCode && gap < 1200) return;             // same barcode still in view
   lastCode = code; lastTime = now;
   if (navigator.vibrate) navigator.vibrate(60);
   beep();
   const fr = document.querySelector('.frame'); fr.classList.add('ok'); setTimeout(() => fr.classList.remove('ok'), 350);
   const found = findItem(code);
+  if (batch && found) { const b = batchList.get(found.serial) || { it: found, qty: 0 }; b.qty++; batchList.set(found.serial, b); updateBatchUI(); }
   const res = $('res');
   res.classList.add('show'); res.classList.toggle('nf', !found);
   $('r-sn').textContent = 'SN: ' + code;
@@ -670,6 +679,48 @@ function closeScanner() {
 
 $('sc-back').addEventListener('click', closeScanner);
 $('sc-flash').addEventListener('click', toggleTorch);
+/* ----- Batch mode + photo / gallery scan ----- */
+function updateBatchUI() {
+  let n = 0, l = 0, u = 0;
+  batchList.forEach(b => { n += b.qty; l += (b.it.priceLL || 0) * b.qty; u += (b.it.priceUSD || 0) * b.qty; });
+  $('r-batch').style.display = batch ? 'block' : 'none';
+  $('r-clear').style.display = batch ? '' : 'none';
+  $('r-batch').textContent = n + (n === 1 ? ' item · ' : ' items · ') + ll(l) + ' · ' + usd(u);
+  $('sc-batch').classList.toggle('on', batch);
+}
+$('sc-batch').addEventListener('click', () => {
+  batch = !batch;
+  if (batch) {
+    const res = $('res'); res.classList.add('show'); res.classList.remove('nf');
+    $('r-sn').textContent = ''; $('r-name').textContent = 'Batch mode: scan items'; $('r-ll').textContent = ''; $('r-usd').textContent = '';
+  } else batchList.clear();
+  updateBatchUI();
+});
+$('r-clear').addEventListener('click', () => { batchList.clear(); updateBatchUI(); });
+
+async function decodeFile(file) {
+  if (!file) return;
+  showToast('Reading image…', false, true);
+  let text = null;
+  try {
+    if ('BarcodeDetector' in window) {
+      let det; try { det = new BarcodeDetector({ formats: FORMATS }); } catch (_) { det = new BarcodeDetector(); }
+      const bmp = await createImageBitmap(file);
+      const codes = await det.detect(bmp);
+      if (codes.length) text = codes[0].rawValue;
+    }
+    if (!text && window.Html5Qrcode) {
+      const hq = new Html5Qrcode('hq', { verbose: false });
+      try { text = await hq.scanFile(file, false); } catch (_) {}
+    }
+  } catch (e) { console.warn('decodeFile', e); }
+  if (text) { lastCode = ''; seenAt = 0; onCode(text); showToast('Scanned'); }
+  else showToast('No barcode found. Retake the photo closer, flat and well lit.', true);
+}
+['f-photo', 'f-gallery'].forEach(id => $(id).addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; decodeFile(f); }));
+$('sc-photo').addEventListener('click', () => $('f-photo').click());
+$('sc-gallery').addEventListener('click', () => $('f-gallery').click());
+
 $('zslider').addEventListener('input', e => setZoom(e.target.value));
 document.querySelectorAll('.zb').forEach(b => b.addEventListener('click', () => setZoom(b.dataset.z)));
 $('open-cam').addEventListener('click', () => openScanner('app'));
