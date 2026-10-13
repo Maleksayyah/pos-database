@@ -501,33 +501,60 @@ async function refreshCameraList() {
 
 async function startCameraScanner(cameraId = null) {
   $('cam-overlay').classList.add('open');
+  $('switch-camera').disabled = true;
+  $('switch-camera').textContent = 'Finding cameras…';
   flashState = false;
   $('flash-toggle').textContent = '⚡ Flash';
-  const scanner = await ensureScanner();
-  if (scanner.isScanning) return;
 
+  let scanner;
   try {
-    const cameraChoice = cameraId || { facingMode: { ideal: 'environment' } };
-    await scanner.start(
-      cameraChoice,
-      { fps: 15, qrbox: (viewWidth, viewHeight) => {
-          const width = Math.min(Math.floor(viewWidth * 0.88), 360);
-          const height = Math.min(Math.floor(viewHeight * 0.42), 180);
-          return { width, height };
-        },
-        aspectRatio: 1.333
+    scanner = await ensureScanner();
+    if (scanner.isScanning) {
+      await refreshCameraList();
+      return;
+    }
+
+    const config = {
+      fps: 12,
+      qrbox: (viewWidth, viewHeight) => {
+        const width = Math.max(180, Math.min(Math.floor(viewWidth * 0.88), 360));
+        const height = Math.max(90, Math.min(Math.floor(viewHeight * 0.32), 160));
+        return { width, height };
       },
-      decodedText => {
-        stopCameraScanner();
-        showScan(decodedText);
-      },
-      () => {}
-    );
+      aspectRatio: 1.333
+    };
+    const onSuccess = decodedText => {
+      stopCameraScanner();
+      showScan(decodedText);
+    };
+    const onFailure = () => {};
+
+    // html5-qrcode expects facingMode as a plain string, not a nested
+    // MediaTrackConstraints object. Prefer a selected device ID when supplied.
+    try {
+      await scanner.start(cameraId || { facingMode: 'environment' }, config, onSuccess, onFailure);
+    } catch (firstError) {
+      console.warn('Preferred camera start failed; trying enumerated rear camera:', firstError);
+      if (scanner.isScanning) {
+        try { await scanner.stop(); } catch (_) {}
+      }
+      const devices = await Html5Qrcode.getCameras();
+      availableCameras = (devices || []).filter(d => d.id);
+      if (!availableCameras.length) throw firstError;
+      const rear = availableCameras.find(d => /back|rear|environment|tele|wide/i.test(d.label || '')) ||
+                   availableCameras[availableCameras.length - 1];
+      const fallback = cameraId && rear.id === cameraId
+        ? availableCameras.find(d => d.id !== cameraId) || rear
+        : rear;
+      await scanner.start(fallback.id, config, onSuccess, onFailure);
+      activeCameraIndex = availableCameras.findIndex(d => d.id === fallback.id);
+    }
 
     currentStreamTrack = getVideoTrack();
     await refreshCameraList();
-    // Request continuous autofocus if this selected lens exposes that capability.
-    setTimeout(async () => {
+
+    // Optional settings must never prevent the preview from opening.
+    window.setTimeout(async () => {
       const track = currentStreamTrack || getVideoTrack();
       if (!track || track.readyState !== 'live') return;
       try {
@@ -535,19 +562,25 @@ async function startCameraScanner(cameraId = null) {
         if (caps.focusMode && caps.focusMode.includes('continuous')) {
           await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
         }
-        if (caps.zoom) {
-          const min = Number(caps.zoom.min ?? 1);
-          const max = Number(caps.zoom.max ?? min);
-          if (max > min) await applyCameraZoom(Math.min(max, Math.max(min, 2)), false);
-        }
       } catch (e) {
-        console.warn('Optional focus/zoom setting unavailable:', e);
+        console.warn('Continuous autofocus unavailable; continuing without it:', e);
       }
-    }, 700);
+    }, 500);
   } catch (err) {
     console.error('Camera startup failed:', err);
-    showToast('Could not open this camera lens. Try Switch Lens or check camera permission.', true);
-    if (!scanner.isScanning) $('cam-overlay').classList.remove('open');
+    $('cam-overlay').classList.remove('open');
+    let message = 'Could not open camera. Check Chrome camera permission and use HTTPS.';
+    if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
+      message = 'Camera permission denied. In Chrome, allow Camera for this website and try again.';
+    } else if (err && (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError')) {
+      message = 'No camera was found. Check Android camera permission and try again.';
+    } else if (err && (err.name === 'NotReadableError' || err.name === 'TrackStartError')) {
+      message = 'Camera is busy. Close the Camera app and other scanner tabs, then retry.';
+    }
+    showToast(message, true);
+    if (scanner && scanner.isScanning) {
+      try { await scanner.stop(); } catch (_) {}
+    }
   }
 }
 
