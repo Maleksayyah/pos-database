@@ -105,7 +105,9 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
 .modal h3{font-size:1.15rem;margin-bottom:14px;color:#fff;font-weight:600}
 .fg{margin-bottom:12px}.fg label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase}
 .fg input{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:1rem}
-.m-act{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.m-act{display:flex;justify-content:space-between;align-items:center;margin-top:16px}
+.zoom-controls{display:flex;gap:6px}
+.zoom-btn{background:var(--card); color:var(--ink); border:1px solid var(--line); padding:6px 10px; border-radius:8px; font-size:0.8rem; font-weight:600}
 .m-err{color:var(--danger);font-size:.8rem;min-height:1.2em;margin-top:6px}
 
 #scanner-wrapper{width:100%; overflow:hidden; border-radius:12px; background:#000; border:1px solid var(--line); position:relative}
@@ -207,6 +209,11 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
       <div id="interactive"></div>
     </div>
     <div class="m-act">
+      <div class="zoom-controls">
+        <button class="zoom-btn" onclick="setZoom(1)">1x</button>
+        <button class="zoom-btn" onclick="setZoom(2)">2x</button>
+        <button class="zoom-btn" onclick="setZoom(3)">3x</button>
+      </div>
       <button class="btn light" id="cam-close">Close</button>
     </div>
   </div>
@@ -404,7 +411,7 @@ function showScan(serial) {
   return !!found;
 }
 
-/* ---------- Camera Scanner ---------- */
+/* ---------- Camera Scanner with Fixed Focus & Zoom ---------- */
 function getVideoTrack() {
   const v = document.querySelector('#interactive video');
   return v && v.srcObject ? v.srcObject.getVideoTracks()[0] : null;
@@ -419,25 +426,53 @@ async function startCameraScanner() {
   if (html5QrcodeScanner.isScanning) return;
 
   try {
+    // Request back camera with focus mode constraints enabled
     await html5QrcodeScanner.start(
       { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 220, height: 150 } },
+      { 
+        fps: 15, 
+        qrbox: { width: 250, height: 160 },
+        aspectRatio: 1.777778
+      },
       (decodedText) => { stopCameraScanner(); showScan(decodedText); },
       () => {}
     );
 
     currentStreamTrack = getVideoTrack();
+    
     if (currentStreamTrack && currentStreamTrack.getCapabilities) {
       const caps = currentStreamTrack.getCapabilities();
+      const constraints = { advanced: [] };
+
+      // Force initial focus mode to continuous if supported
+      if (caps.focusMode && caps.focusMode.includes('continuous')) {
+        constraints.advanced.push({ focusMode: 'continuous' });
+      }
+
+      // Default to 2x zoom to bypass wide-angle distortion and get closer to barcodes
       if (caps.zoom) {
-        const z = Math.min(Math.max(1, caps.zoom.min), caps.zoom.max);
-        try { await currentStreamTrack.applyConstraints({ advanced: [{ zoom: z }] }); } catch (e) {}
+        const defaultZoom = Math.min(Math.max(2, caps.zoom.min), caps.zoom.max);
+        constraints.advanced.push({ zoom: defaultZoom });
+      }
+
+      if (constraints.advanced.length > 0) {
+        try { await currentStreamTrack.applyConstraints(constraints); } catch (e) {}
       }
     }
   } catch (err) {
     console.error(err);
     showToast('Camera access failed (allow permission)', true);
     $('cam-overlay').classList.remove('open');
+  }
+}
+
+async function setZoom(zoomLevel) {
+  const track = currentStreamTrack || getVideoTrack();
+  if (!track) return;
+  const caps = track.getCapabilities ? track.getCapabilities() : {};
+  if (caps.zoom) {
+    const z = Math.min(Math.max(zoomLevel, caps.zoom.min), caps.zoom.max);
+    try { await track.applyConstraints({ advanced: [{ zoom: z }] }); } catch (e) {}
   }
 }
 
