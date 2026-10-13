@@ -287,9 +287,10 @@ async function loadData() {
   render();
 }
 
-/* ---------- Login ---------- */
+/* ---------- Login & Session Persistence ---------- */
 function selectRole(r) {
   admin = r === 'Admin';
+  localStorage.setItem('pos_user_role', r);
   $('login').classList.add('hidden');
   $('app').classList.remove('hidden');$('role-sub').textContent = r;
   $('admin-tools').classList.toggle('hidden', !admin);
@@ -298,9 +299,18 @@ function selectRole(r) {
 }
 
 function logout() {
+  localStorage.removeItem('pos_user_role');
   $('app').classList.add('hidden');$('login').classList.remove('hidden');
   sel.clear(); query = ''; $('q').value = '';
 }
+
+// Auto-login on page load if role exists
+window.addEventListener('DOMContentLoaded', () => {
+  const savedRole = localStorage.getItem('pos_user_role');
+  if (savedRole) {
+    selectRole(savedRole);
+  }
+});
 
 /* ---------- Render ---------- */
 function render() { renderCats(); renderItems(); renderSel(); }
@@ -411,7 +421,7 @@ function showScan(serial) {
   return !!found;
 }
 
-/* ---------- Camera Scanner with Fixed Focus & Zoom ---------- */
+/* ---------- Camera Scanner with Fixed Zoom & Focus ---------- */
 function getVideoTrack() {
   const v = document.querySelector('#interactive video');
   return v && v.srcObject ? v.srcObject.getVideoTracks()[0] : null;
@@ -426,38 +436,36 @@ async function startCameraScanner() {
   if (html5QrcodeScanner.isScanning) return;
 
   try {
-    // Request back camera with focus mode constraints enabled
     await html5QrcodeScanner.start(
       { facingMode: "environment" },
-      { 
-        fps: 15, 
-        qrbox: { width: 250, height: 160 },
-        aspectRatio: 1.777778
-      },
+      { fps: 15, qrbox: { width: 250, height: 160 } },
       (decodedText) => { stopCameraScanner(); showScan(decodedText); },
       () => {}
     );
 
     currentStreamTrack = getVideoTrack();
     
-    if (currentStreamTrack && currentStreamTrack.getCapabilities) {
-      const caps = currentStreamTrack.getCapabilities();
-      const constraints = { advanced: [] };
-
-      // Force initial focus mode to continuous if supported
-      if (caps.focusMode && caps.focusMode.includes('continuous')) {
-        constraints.advanced.push({ focusMode: 'continuous' });
-      }
-
-      // Default to 2x zoom to bypass wide-angle distortion and get closer to barcodes
-      if (caps.zoom) {
-        const defaultZoom = Math.min(Math.max(2, caps.zoom.min), caps.zoom.max);
-        constraints.advanced.push({ zoom: defaultZoom });
-      }
-
-      if (constraints.advanced.length > 0) {
-        try { await currentStreamTrack.applyConstraints(constraints); } catch (e) {}
-      }
+    if (currentStreamTrack) {
+      setTimeout(async () => {
+        try {
+          const caps = currentStreamTrack.getCapabilities ? currentStreamTrack.getCapabilities() : {};
+          const advancedConstraints = [];
+          
+          if (caps.focusMode && caps.focusMode.includes('continuous')) {
+            advancedConstraints.push({ focusMode: 'continuous' });
+          }
+          if (caps.zoom) {
+            const defaultZoom = Math.min(Math.max(2, caps.zoom.min), caps.zoom.max);
+            advancedConstraints.push({ zoom: defaultZoom });
+          }
+          
+          if (advancedConstraints.length > 0) {
+            await currentStreamTrack.applyConstraints({ advanced: advancedConstraints });
+          }
+        } catch (e) {
+          console.warn('Could not apply advanced camera constraints', e);
+        }
+      }, 500);
     }
   } catch (err) {
     console.error(err);
@@ -469,10 +477,14 @@ async function startCameraScanner() {
 async function setZoom(zoomLevel) {
   const track = currentStreamTrack || getVideoTrack();
   if (!track) return;
-  const caps = track.getCapabilities ? track.getCapabilities() : {};
-  if (caps.zoom) {
-    const z = Math.min(Math.max(zoomLevel, caps.zoom.min), caps.zoom.max);
-    try { await track.applyConstraints({ advanced: [{ zoom: z }] }); } catch (e) {}
+  try {
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    if (caps.zoom) {
+      const z = Math.min(Math.max(zoomLevel, caps.zoom.min), caps.zoom.max);
+      await track.applyConstraints({ advanced: [{ zoom: z }] });
+    }
+  } catch (e) {
+    console.error('Zoom not supported', e);
   }
 }
 
