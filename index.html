@@ -6,6 +6,8 @@
 <title>POS System</title>
 <!-- Barcode Scanner Library -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<!-- Supabase JS Client Library -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
   --bg: #090d16;
@@ -226,33 +228,53 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;backgroun
 <div id="toast"><span class="spin hidden" id="t-spin"></span><span id="t-text"></span></div>
 
 <script>
+// --- SUPABASE CONFIGURATION ---
+const SUPABASE_URL = "https://kkmfhvuwanzugffmytlg.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_pYeJwa6OZPeKW8fI34I7bQ_WdUs5Bfb";
+
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 let store = { categories: [] }, admin = false, cat = 0, query = '', sel = new Set();
-let scanT = null, toastT = null, onSave = null, html5QrcodeScanner = null, flashState = false, currentStreamTrack = null;
+let scanT = null, toastT = null, html5QrcodeScanner = null, flashState = false, currentStreamTrack = null;
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const usd = n => '$' + (Number(n) || 0).toFixed(2);
 const ll = n => 'L.L. ' + (Number(n) || 0).toLocaleString('en-US');
 
-// GitHub API Configuration
-const GITHUB_USER = "maleksayyah";
-const GITHUB_REPO = "pos-database";
-const GITHUB_PATH = "data.json";
-
-/* ---------- Data Loading ---------- */
+/* ---------- Data Loading from Supabase ---------- */
 async function loadData() {
   try {
-    const r = await fetch('https://raw.githubusercontent.com/' + GITHUB_USER + '/' + GITHUB_REPO + '/main/' + GITHUB_PATH + '?t=' + Date.now());
-    if (!r.ok) throw new Error(r.status);
-    const d = await r.json();
-    if (d && Array.isArray(d.categories)) {
-      store = d;
-      localStorage.setItem('pos_store_data', JSON.stringify(store));
-    }
+    showToast('Loading data...', false, true);
+    
+    const { data: catData, error: catErr } = await supabaseClient.from('categories').select('*');
+    if (catErr) throw catErr;
+
+    const { data: itemData, error: itemErr } = await supabaseClient.from('items').select('*');
+    if (itemErr) throw itemErr;
+
+    store.categories = (catData || []).map(c => ({
+      id: c.id,
+      name: c.name,
+      items: (itemData || [])
+        .filter(i => i.category_id === c.id)
+        .map(i => ({
+          serial: i.serial,
+          name: i.name,
+          priceUSD: Number(i.price_usd),
+          priceLL: Number(i.price_ll)
+        }))
+    }));
+
+    localStorage.setItem('pos_store_data', JSON.stringify(store));
+    showToast('Loaded successfully!');
   } catch (e) {
+    console.error(e);
     const local = localStorage.getItem('pos_store_data');
     if (local) {
       store = JSON.parse(local);
       showToast('Loaded from local storage (Offline)', true);
+    } else {
+      showToast('Failed to load data', true);
     }
   }
   render();
@@ -342,6 +364,7 @@ function showToast(text, isError = false, loading = false) {
   if (!loading) toastT = setTimeout(() => t.classList.remove('show'), 4000);
 }
 
+let onSave = null;
 function openModal(title, html, save, label = 'Save', danger = false) {
   $('m-title').textContent = title;
   $('m-body').innerHTML = html;
@@ -359,11 +382,11 @@ function closeModal() { $('overlay').classList.remove('open'); onSave = null; $(
 function submitModal() {
   if (!onSave) return;
   const err = onSave();
-  if (err) $('m-err').textContent = err; else closeModal();
+  if (err && typeof err === 'string') { $('m-err').textContent = err; }
 }
 
 function confirmBox(msg, fn) {
-  openModal('Confirm', `<p style="color:var(--muted)">${esc(msg)}</p>`, () => { fn(); return ''; }, 'Delete', true);
+  openModal('Confirm', `<p style="color:var(--muted)">${esc(msg)}</p>`, () => { fn(); closeModal(); return ''; }, 'Delete', true);
 }
 
 function showScan(serial) {
@@ -381,7 +404,7 @@ function showScan(serial) {
   return !!found;
 }
 
-/* ---------- Camera Scanner with 1x & Flash ---------- */
+/* ---------- Camera Scanner ---------- */
 function getVideoTrack() {
   const v = document.querySelector('#interactive video');
   return v && v.srcObject ? v.srcObject.getVideoTracks()[0] : null;
@@ -396,7 +419,6 @@ async function startCameraScanner() {
   if (html5QrcodeScanner.isScanning) return;
 
   try {
-    // Must be exactly ONE key here
     await html5QrcodeScanner.start(
       { facingMode: "environment" },
       { fps: 10, qrbox: { width: 220, height: 150 } },
@@ -405,8 +427,6 @@ async function startCameraScanner() {
     );
 
     currentStreamTrack = getVideoTrack();
-
-    // Force 1x zoom (avoids the 0.5x ultra-wide look)
     if (currentStreamTrack && currentStreamTrack.getCapabilities) {
       const caps = currentStreamTrack.getCapabilities();
       if (caps.zoom) {
@@ -416,10 +436,7 @@ async function startCameraScanner() {
     }
   } catch (err) {
     console.error(err);
-    const msg = (location.protocol !== 'https:' && location.hostname !== 'localhost')
-      ? 'Camera needs HTTPS'
-      : 'Camera access failed (allow permission)';
-    showToast(msg, true);
+    showToast('Camera access failed (allow permission)', true);
     $('cam-overlay').classList.remove('open');
   }
 }
@@ -428,14 +445,14 @@ function toggleFlash() {
   const track = currentStreamTrack || getVideoTrack();
   if (!track) return showToast('Camera stream not active', true);
   const caps = track.getCapabilities ? track.getCapabilities() : {};
-  if (!caps.torch) return showToast('Flashlight not supported on this device', true);
+  if (!caps.torch) return showToast('Flashlight not supported', true);
   const next = !flashState;
   track.applyConstraints({ advanced: [{ torch: next }] })
     .then(() => {
       flashState = next;
       $('flash-toggle').textContent = flashState ? '⚡ Flash (On)' : '⚡ Flash';
     })
-    .catch(() => showToast('Flashlight not supported on this device', true));
+    .catch(() => showToast('Flashlight not supported', true));
 }
 
 function stopCameraScanner() {
@@ -446,116 +463,82 @@ function stopCameraScanner() {
   } else close();
 }
 
-function getToken(force) {
-  let t = localStorage.getItem('pos_gh_token');
-  if (!t || force) {
-    t = (prompt('Paste your GitHub token (Contents: Read & Write on pos-database):') || '').trim();
-    if (t) localStorage.setItem('pos_gh_token', t);
-  }
-  return t;
-}
-
-async function sync() {
-  render();
-  const dataStr = JSON.stringify(store, null, 2);
-  localStorage.setItem('pos_store_data', dataStr);
-
-  const token = getToken(false);
-  if (!token) return showToast('Saved locally (no GitHub token)', true);
-  showToast('Pushing changes to GitHub...', false, true);
-
-  const apiUrl = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${GITHUB_PATH}`;
-  const headers = {
-    "Authorization": `Bearer ${token}`,
-    "Accept": "application/vnd.github+json"
-  };
-  const content = btoa(unescape(encodeURIComponent(dataStr)));
-
-  try {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const getRes = await fetch(apiUrl + '?ref=main&t=' + Date.now(), { headers, cache: 'no-store' });
-      if (getRes.status === 401) {
-        localStorage.removeItem('pos_gh_token');
-        throw new Error('Token invalid/expired (401)');
-      }
-      if (getRes.status === 404) throw new Error('File/repo not found or token lacks access (404)');
-      if (!getRes.ok) throw new Error('GET failed ' + getRes.status);
-      const sha = (await getRes.json()).sha;
-
-      const putRes = await fetch(apiUrl, {
-        method: "PUT",
-        headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: "Update POS database inventory from app",
-          content, sha, branch: "main"
-        })
-      });
-      if (putRes.ok) return showToast('Successfully updated on GitHub!', false);
-      if (putRes.status === 409 && attempt === 0) continue; // stale SHA, retry
-      const j = await putRes.json().catch(() => ({}));
-      throw new Error('PUT ' + putRes.status + (j.message ? ': ' + j.message : ''));
-    }
-  } catch (err) {
-    console.error(err);
-    showToast('Saved locally. GitHub: ' + err.message, true);
-  }
-}
-
-/* ---------- Admin Actions ---------- */
+/* ---------- Admin Database Actions (Supabase) ---------- */
 const field = (id, label, type = 'text', val = '', extra = '') =>
   `<div class="fg"><label for="${id}">${label}</label><input id="${id}" type="${type}" value="${esc(val)}" ${extra}></div>`;
 
-function addCategory() {
-  openModal('New Category', field('f-name', 'Name'), () => {
+async function addCategory() {
+  openModal('New Category', field('f-name', 'Name'), async () => {
     const name = $('f-name').value.trim();
     if (!name) return 'Enter a category name.';
-    store.categories.push({ id: 'cat_' + Date.now(), name, items: [] });
+    const id = 'cat_' + Date.now();
+    
+    showToast('Saving...', false, true);
+    const { error } = await supabaseClient.from('categories').insert([{ id, name }]);
+    if (error) { showToast(error.message, true); return error.message; }
+
+    store.categories.push({ id, name, items: [] });
     cat = store.categories.length - 1; query = ''; $('q').value = '';
-    sync(); return '';
+    render(); closeModal(); showToast('Category added!');
   });
 }
 
-function addItem() {
+async function addItem() {
   if (!store.categories.length) return showToast('Create a category first.', true);
   openModal('Add Product',
     field('f-serial', 'Barcode / Serial') + field('f-name', 'Product Name') +
-    field('f-usd', 'Price (USD)', 'number', '', 'step="0.01" min="0"') + field('f-ll', 'Price (L.L.)', 'number', '0', 'min="0"'), () => {
+    field('f-usd', 'Price (USD)', 'number', '', 'step="0.01" min="0"') + field('f-ll', 'Price (L.L.)', 'number', '0', 'min="0"'), async () => {
     const serial = $('f-serial').value.trim(), name =$('f-name').value.trim();
-    const p = parseFloat($('f-usd').value), l = parseFloat($('f-ll').value) || 0;
-    if (!serial || !name || isNaN(p)) return 'Fields required.';
-    const dup = store.categories.some(c => (c.items || []).some(i => i.serial.toLowerCase() === serial.toLowerCase()));
-    if (dup) return 'Serial already exists.';
-    const c = store.categories[cat];
-    (c.items = c.items || []).push({ serial, name, priceUSD: p, priceLL: l });
-    sync(); return '';
+    const price_usd = parseFloat($('f-usd').value), price_ll = parseFloat($('f-ll').value) || 0;
+    if (!serial || !name || isNaN(price_usd)) return 'Fields required.';
+
+    showToast('Saving...', false, true);
+    const category_id = store.categories[cat].id;
+    const { error } = await supabaseClient.from('items').insert([{ serial, category_id, name, price_usd, price_ll }]);
+    if (error) { showToast(error.message, true); return error.message; }
+
+    (store.categories[cat].items = store.categories[cat].items || []).push({ serial, name, priceUSD: price_usd, priceLL: price_ll });
+    render(); closeModal(); showToast('Product added!');
   });
 }
 
-function editItem(ci, serial) {
+async function editItem(ci, serial) {
   const item = (store.categories[ci].items || []).find(i => i.serial === serial);
   if (!item) return;
   openModal('Edit Product',
     field('f-name', 'Name', 'text', item.name) +
     field('f-usd', 'Price (USD)', 'number', item.priceUSD, 'step="0.01" min="0"') +
-    field('f-ll', 'Price (L.L.)', 'number', item.priceLL || 0, 'min="0"'), () => {
-    const name = $('f-name').value.trim(), p = parseFloat($('f-usd').value);
-    if (!name || isNaN(p)) return 'Fields required.';
-    item.name = name; item.priceUSD = p; item.priceLL = parseFloat($('f-ll').value) || 0;
-    sync(); return '';
+    field('f-ll', 'Price (L.L.)', 'number', item.priceLL || 0, 'min="0"'), async () => {
+    const name = $('f-name').value.trim(), price_usd = parseFloat($('f-usd').value), price_ll = parseFloat($('f-ll').value) || 0;
+    if (!name || isNaN(price_usd)) return 'Fields required.';
+
+    showToast('Updating...', false, true);
+    const { error } = await supabaseClient.from('items').update({ name, price_usd, price_ll }).eq('serial', serial);
+    if (error) { showToast(error.message, true); return error.message; }
+
+    item.name = name; item.priceUSD = price_usd; item.priceLL = price_ll;
+    render(); closeModal(); showToast('Product updated!');
   });
 }
 
-function delItem(ci, serial) {
-  confirmBox('Remove product?', () => {
+async function delItem(ci, serial) {
+  confirmBox('Remove product?', async () => {
+    showToast('Deleting...', false, true);
+    await supabaseClient.from('items').delete().eq('serial', serial);
     const c = store.categories[ci];
     c.items = (c.items || []).filter(i => i.serial !== serial);
-    sel.delete(serial); sync();
+    sel.delete(serial);
+    render(); showToast('Product deleted');
   });
 }
 
-function delCat(i) {
-  confirmBox(`Delete category?`, () => {
-    store.categories.splice(i, 1); cat = 0; sync();
+async function delCat(i) {
+  confirmBox(`Delete category and all its items?`, async () => {
+    showToast('Deleting...', false, true);
+    const catId = store.categories[i].id;
+    await supabaseClient.from('categories').delete().eq('id', catId);
+    store.categories.splice(i, 1); cat = 0;
+    render(); showToast('Category deleted');
   });
 }
 
@@ -564,7 +547,6 @@ $('logout').addEventListener('click', logout);$('add-cat').addEventListener('cli
 $('add-item').addEventListener('click', addItem);$('m-cancel').addEventListener('click', closeModal);
 $('m-save').addEventListener('click', submitModal);$('overlay').addEventListener('mousedown', e => { if (e.target === $('overlay')) closeModal(); });$('sel-clear').addEventListener('click', () => { sel.clear(); renderItems(); renderSel(); });
 
-/* Mobile Navigation Drawer */
 const closeDrawer = () => {
   $('sidebar').classList.remove('mobile-open');$('drawer-backdrop').classList.remove('open');
 };
@@ -573,7 +555,6 @@ $('open-menu').addEventListener('click', () => {
 });
 $('close-menu').addEventListener('click', closeDrawer);$('drawer-backdrop').addEventListener('click', closeDrawer);
 
-/* Camera Events */
 $('open-cam').addEventListener('click', startCameraScanner);$('cam-close').addEventListener('click', stopCameraScanner);
 
 $('cats').addEventListener('click', e => {
