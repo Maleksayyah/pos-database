@@ -480,22 +480,41 @@ async function ensureScanner() {
   return html5QrcodeScanner;
 }
 
+function isFrontCameraLabel(label) {
+  return /front|user[- ]?facing|facetime|selfie/i.test(label || '');
+}
+
+function isRearCameraLabel(label) {
+  return /back|rear|environment|facing back|telephoto|tele|wide|ultra.?wide/i.test(label || '');
+}
+
 async function refreshCameraList() {
+  const button = $('switch-camera');
   try {
     const devices = await Html5Qrcode.getCameras();
     availableCameras = (devices || []).filter(d => d.id);
     const track = currentStreamTrack || getVideoTrack();
-    const activeId = track && track.getSettings ? track.getSettings().deviceId : null;
-    const foundIndex = availableCameras.findIndex(d => d.id === activeId);
-    if (foundIndex >= 0) activeCameraIndex = foundIndex;
-    $('switch-camera').disabled = availableCameras.length < 2;
-    $('switch-camera').textContent = availableCameras.length > 1
-      ? `Switch Lens (${activeCameraIndex + 1}/${availableCameras.length})`
-      : 'No Other Lens';
+    const settings = track && track.getSettings ? track.getSettings() : {};
+    const activeId = settings.deviceId || null;
+    const activeIndex = availableCameras.findIndex(d => d.id === activeId);
+    if (activeIndex >= 0) activeCameraIndex = activeIndex;
+
+    // Only offer cameras explicitly identified as rear-facing. Never cycle to
+    // an unknown camera as a fallback, because that often switches to selfie.
+    const labelledRear = availableCameras.filter(d => isRearCameraLabel(d.label) && !isFrontCameraLabel(d.label));
+    const hasNamedRearAlternative = labelledRear.some(d => d.id !== activeId);
+    button.disabled = !hasNamedRearAlternative;
+    button.textContent = hasNamedRearAlternative ? 'Switch Rear Lens' : 'Rear Lens Unavailable';
+    button.title = hasNamedRearAlternative
+      ? 'Switch between rear cameras exposed by Chrome'
+      : 'Chrome has not exposed another identifiable rear camera';
   } catch (e) {
-    console.warn('Could not enumerate camera lenses:', e);
-    $('switch-camera').disabled = true;
-    $('switch-camera').textContent = 'Lens unavailable';
+    console.warn('Could not enumerate cameras:', e);
+    availableCameras = [];
+    // Keep scanning usable even when enumeration is blocked by the browser.
+    button.disabled = true;
+    button.textContent = 'Rear Lens Unavailable';
+    button.title = 'Camera scanning can continue; Chrome did not provide a camera list';
   }
 }
 
@@ -538,16 +557,13 @@ async function startCameraScanner(cameraId = null) {
       if (scanner.isScanning) {
         try { await scanner.stop(); } catch (_) {}
       }
-      const devices = await Html5Qrcode.getCameras();
-      availableCameras = (devices || []).filter(d => d.id);
-      if (!availableCameras.length) throw firstError;
-      const rear = availableCameras.find(d => /back|rear|environment|tele|wide/i.test(d.label || '')) ||
-                   availableCameras[availableCameras.length - 1];
-      const fallback = cameraId && rear.id === cameraId
-        ? availableCameras.find(d => d.id !== cameraId) || rear
-        : rear;
-      await scanner.start(fallback.id, config, onSuccess, onFailure);
-      activeCameraIndex = availableCameras.findIndex(d => d.id === fallback.id);
+      // Do not pick the last enumerated device: on some Samsung phones that is
+      // the front camera. If a chosen device fails, retry the rear-facing mode.
+      if (cameraId) {
+        await scanner.start({ facingMode: 'environment' }, config, onSuccess, onFailure);
+      } else {
+        throw firstError;
+      }
     }
 
     currentStreamTrack = getVideoTrack();
@@ -587,30 +603,29 @@ async function startCameraScanner(cameraId = null) {
 async function switchCameraLens() {
   const scanner = html5QrcodeScanner;
   if (!scanner || !scanner.isScanning) return showToast('Open the scanner first.', true);
+
   await refreshCameraList();
-  if (availableCameras.length < 2) {
-    showToast('Android only exposes one camera to this browser. Try Chrome and allow camera permission.', true);
+  const track = currentStreamTrack || getVideoTrack();
+  const activeId = track && track.getSettings ? track.getSettings().deviceId : null;
+  const rearCameras = availableCameras.filter(d => isRearCameraLabel(d.label) && !isFrontCameraLabel(d.label));
+  const alternatives = rearCameras.filter(d => d.id !== activeId);
+
+  if (!alternatives.length) {
+    showToast('Chrome exposes no other identifiable rear lens. The current rear camera is still active.', true);
     return;
   }
 
-  const currentTrack = currentStreamTrack || getVideoTrack();
-  const currentId = currentTrack && currentTrack.getSettings ? currentTrack.getSettings().deviceId : null;
-  const currentIndex = availableCameras.findIndex(d => d.id === currentId);
-  activeCameraIndex = ((currentIndex >= 0 ? currentIndex : activeCameraIndex) + 1) % availableCameras.length;
-  const target = availableCameras[activeCameraIndex];
+  const target = alternatives[0];
   try {
     await scanner.stop();
     currentStreamTrack = null;
     flashState = false;
     $('flash-toggle').textContent = '⚡ Flash';
     await startCameraScanner(target.id);
-    if (scanner.isScanning) {
-      const label = target.label || `Camera ${activeCameraIndex + 1}`;
-      showToast('Using: ' + label);
-    }
+    if (scanner.isScanning) showToast('Switched to rear camera: ' + (target.label || 'rear camera'));
   } catch (e) {
-    console.error('Switch lens failed:', e);
-    showToast('Could not switch lens. This phone may expose only one usable camera.', true);
+    console.error('Switch rear camera failed:', e);
+    showToast('Could not switch rear lens. Chrome may expose only one rear camera.', true);
   }
 }
 
